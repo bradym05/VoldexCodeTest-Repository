@@ -2,10 +2,7 @@
 This module initializes an OOP "PlayerData" class for ease of use. Each created object handles access to DataStores with security and loss prevention at the forefront.
 See: https://devforum.roblox.com/t/details-on-datastoreservice-for-advanced-developers/175804
 
-MessagingService is used for session locking, preventing data from saving on multiple servers. 
-
-TODO:
-Session locking
+MemoryStoreService is used for session locking, preventing data from saving on multiple servers. 
 
 --]]
 
@@ -14,10 +11,12 @@ Session locking
 --Services
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
-local MessagingService = game:GetService("MessagingService")
+local MemoryStoreService = game:GetService("MemoryStoreService")
 
 --Current save
 local SaveFile = DataStoreService:GetDataStore("Save123456")
+--Active saving store
+local SaveStore = MemoryStoreService:GetSortedMap("Saving")
 
 --Unique server identifier
 local serverCode = os.time()
@@ -30,6 +29,12 @@ local CACHE_TIME = 5 -- IMPORTANT: VALUE MUST BE >= 4! Cache time in seconds for
 --Manipulated
 local requestCounts = {} -- {sent, pending}
 local lastRequest = {}
+
+--Some of the DataStoreRequestType enums refer to multiple requests, translated here
+local translatedRequests = {
+    SetAsync = Enum.DataStoreRequestType.SetIncrementAsync,
+    IncrementAsync = Enum.DataStoreRequestType.SetIncrementAsync,
+}
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
@@ -62,11 +67,12 @@ local function checkValue(returned)
         (type(returned) == "table" and not is_mixed(returned)) 
 end
 
---Some of the DataStoreRequestType enums refer to multiple requests, translated here
-local translatedRequests = {
-    SetAsync = Enum.DataStoreRequestType.SetIncrementAsync,
-    IncrementAsync = Enum.DataStoreRequestType.SetIncrementAsync,
-}
+--When a request is dropped, it means the request has exceeded the maximum queue size so best practice is to yield one minute
+--This is unlikely to happen due custom throttling
+local function requestDropped()
+    task.wait(65)
+    return true, false
+end
 
 --Error checks return true to retry, false to error (makes sure valid requests go through)
 --The second return value determines is any budget was consumed (ex. invalid inputs consume no budget)
@@ -116,14 +122,31 @@ local codeChecks = {
     end
 }
 
---When a request is dropped, it means the request has exceeded the maximum queue size so best practice is to yield one minute
---This is unlikely to happen due custom throttling
-local function requestDropped()
-    task.wait(65)
-    return true, false
+--Recursively retry any function based on MAX_RETRIES variable and RETRY_DELAY variable
+--Variable "from" refers to a metatable or service, functionName is the function to call
+local function retryAny(from : any, functionName : String, retries : number, ...)
+    --Check if retries have exceeded or met the maximum and stop recursing, or continue
+    if retries >= MAX_RETRIES then
+        return false
+    else
+        --Store arguments for use in pcall
+        local args = packArgs(...)
+        --Call function
+        local success, result = pcall(function()
+            return from[functionName](from, unpack(args))
+        end)
+        --Check if call was successful
+        if success then
+            --Return values
+            return success, result
+        else
+            --Wait retry delay 
+            task.wait(RETRY_DELAY)
+            --Retry
+            return retryAny(from, functionName, retries + 1, ...)
+        end
+    end
 end
---Error codes 301 - 306 are dropped requests (handled the same) 
-for i = 301,306 do codeChecks[tostring(i)] = requestDropped end
 
 --Safely handles DataStoreService requests by determining the best course of action based on error codes
 local function request(requestName : String, requestType : Enum.DataStoreRequestType, ...)
@@ -202,21 +225,43 @@ local DataObject = {
 }
 DataObject.__index = DataObject
 
+--Creates a new DataObject. Performs checks to ensure that player is not still saving in another server before proceeding.
 function DataObject.new(Player : Player)
     --Create object and corresponding variables
     local self = {}
     self.Player = Player 
-    self.Key = tostring(Player.UserId) -- Store in case player leaves before operation
+    self.Key = tostring(Player.UserId) -- Store string UserId in case player leaves before operation
     self.lastGet = os.clock() - CACHE_TIME -- Prevent unnecessary requests (subtract CACHE_TIME to allow for initial read)
     self.changed = false
     setmetatable(self, DataObject)
-    --Call setup methods
+
+    --INITIAL SETUP CODE--
+    --Get value of UserId key from SaveStore to determine if data is saving in another server
+    local getSuccess, getResult = retryAny(SaveStore, "GetAsync", 0, self.Key)
+    --Check if value was successfully retrieved
+    if getSuccess then
+        --Check if player's data is saving in another server
+        if getResult == true and Player and Player:IsDescendantOf(Players) then
+            --Clean up without saving
+            self:Destroy(true)
+            --Kick player
+            Player:Kick("Your data is saving in another server")
+            return false
+        end
+    else
+        --Clean up without saving
+        self:Destroy(true)
+        return false
+    end
+    --Set value of UserId key to true in SaveStore with an expiration time of one week (604800 seconds)
+    retryAny(SaveStore, "SetAsync", 0, self.Key, true, 604800) 
+    --Get initial data
     self:Read()
-    --Reconcile data
+    --Reconcile data if it doesn't exist
     if not self.Data then
         self.Data = DataObject.TEMPLATE
     end
-    --Methods yield, so make sure Player has not left
+    --The previous methods yield, so make sure Player has not left
     if Player and Player:IsDescendantOf(Players) then
         --Create reference and return
         playerToData[Player] = self
@@ -234,6 +279,8 @@ function DataObject:Destroy(dontSave : boolean)
     if not dontSave then
         self:Update()
     end
+    --Remove from MemoryStore
+    retryAny(SaveStore, "RemoveAsync", 0, self.Key)
     --Clean up self
     table.clear(self)
     setmetatable(self,nil)
@@ -344,6 +391,9 @@ function DataObject:ArrayRemove(key : String, value : any) : boolean
 end
 
 ---------------------// PRIVATE CODE \\--------------------
+
+--Error codes 301 - 306 are dropped requests (handled the same) 
+for i = 301,306 do codeChecks[tostring(i)] = requestDropped end
 
 --Clean up on leave
 Players.PlayerRemoving:Connect(function(Player : Player)

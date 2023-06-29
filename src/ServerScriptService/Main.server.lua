@@ -23,7 +23,6 @@ local tycoons = {}
 local function playerAdded(Player : Player)
     --Create data object
     local dataObject = PlayerData.new(Player)
-    print(dataObject)
     --Make sure player loaded
     if dataObject then
         --Create tycoon and reconcile purchased data if nil

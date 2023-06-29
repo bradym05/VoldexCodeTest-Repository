@@ -34,6 +34,14 @@ PlayerData:<br />
 
 -The functions are too specific and most are redundant. Data does not save. <br />
 
+(Refactored)<br />
+-Data is stored as a dictionary to a single key for each user<br />
+-DataStore requests are made based on the current budget, with custom yielding<br />
+-Data is only saved and loaded when necessary<br />
+-MemoryStoreService is used to refer UserId to a boolean value indicating if that user's data is currently saving<br />
+-Players whose data is saving in another server will be kicked to prevent duplication or data loss<br />
+-Error codes are retrieved and handled uniquely based on the current documentation<br />
+
 TycoonHandler (PadService replacement): <br />
 
 -Created a tycoon template to be cloned for each player. <br />
