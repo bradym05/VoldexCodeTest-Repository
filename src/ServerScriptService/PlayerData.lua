@@ -163,7 +163,10 @@ local function request(requestName : String, requestType : Enum.DataStoreRequest
     end)
     --Handle errors
     if not success then
-        retry, budget = (codeChecks[result] and codeChecks[result](...)) or true, false
+        --Error codes are formatted as "CODE: message", retrieve code, remove spaces
+        local errorCode = string.gsub(result:split(':')[1], " ", "")
+        --Get retry and budget values from custom error handling or set to true and false by default
+        retry, budget = (codeChecks[errorCode] and codeChecks[errorCode](...)) or true, false
     end
     --Increment sent requests (if budget was consumed)
     if budget then
