@@ -29,6 +29,7 @@ local CACHE_TIME = 5 -- IMPORTANT: VALUE MUST BE >= 4! Cache time in seconds for
 --Manipulated
 local requestCounts = {} -- {sent, pending}
 local lastRequest = {}
+local playerToData = {}
 
 --Some of the DataStoreRequestType enums refer to multiple requests, translated here
 local translatedRequests = {
@@ -221,12 +222,15 @@ function safeManage(requestName : String, ...)
 end
 
 ------------------------// CLASS \\------------------------
-local playerToData = {}
-
 local DataObject = {
     TEMPLATE = {},
 }
 DataObject.__index = DataObject
+
+--Allow external scripts to manage data without creating it
+function DataObject.getDataObject(Player : Player)
+    return playerToData[Player]
+end
 
 --Creates a new DataObject. Performs checks to ensure that player is not still saving in another server before proceeding.
 function DataObject.new(Player : Player)
@@ -238,7 +242,8 @@ function DataObject.new(Player : Player)
     self.changed = false
     setmetatable(self, DataObject)
 
-    --INITIAL SETUP CODE--
+    --// INITIAL SETUP CODE \\--
+    
     --Get value of UserId key from SaveStore to determine if data is saving in another server
     local getSuccess, getResult = retryAny(SaveStore, "GetAsync", 0, self.Key)
     --Check if value was successfully retrieved

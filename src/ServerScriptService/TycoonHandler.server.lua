@@ -1,3 +1,8 @@
+--[[
+This script is responsible for managing tycoon objects and the data associated with them
+
+--]]
+
 ------------------// PRIVATE VARIABLES \\------------------
 
 --Services
@@ -5,17 +10,18 @@ local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 --Modules
-local TycoonHandler = require(ServerScriptService:WaitForChild("TycoonHandler"))
 local PlayerData = require(ServerScriptService:WaitForChild("PlayerData"))
+local TycoonClass = require(ServerScriptService:WaitForChild("TycoonClass"))
 
 --DataStore template
 PlayerData.TEMPLATE = {
     Money = 1000,
     Purchased = {},
+    Paycheck = 100,
 }
 
---Other
-local tycoons = {}
+--Manipulated
+local playerToTycoon = {}
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
@@ -25,20 +31,19 @@ local function playerAdded(Player : Player)
     local dataObject = PlayerData.new(Player)
     --Make sure player loaded
     if dataObject then
-        --Create tycoon and reconcile purchased data if nil
-        local tycoon = TycoonHandler.new(Player, dataObject)
-        --Create reference
-        tycoons[Player] = tycoon
+        --Create tycoon and reference
+        local Tycoon = TycoonClass.new(Player)
+        playerToTycoon[Player] = Tycoon
     end
 end
 
 --Clean up when players leave
 local function playerRemoving(Player : Player)
-    --Check if player loaded
-    if tycoons[Player] then
-        --Clean up and remove reference to tycoon
-        tycoons[Player]:Destroy()
-        tycoons[Player] = nil
+    if playerToTycoon[Player] then
+        --Clean up tycoon
+        playerToTycoon[Player]:Destroy()
+        --Remove reference
+        playerToTycoon[Player] = nil
     end
 end
 

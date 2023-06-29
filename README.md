@@ -21,6 +21,7 @@ Other Notes:<br />
 -Deleted "Building - Roblox" from workspace and ReplicatedStorage because the asset Id is invalid. <br />
 -Removed unnecessary "PreviewArea" part from pads. <br />
 -Enabled "TouchesUseCollisionGroups" setting from workspace for registering pad purchases. <br />
+-Disabled CanQuery and CanTouch on all parts except for Pads and PaycheckMachines. <br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.
 
