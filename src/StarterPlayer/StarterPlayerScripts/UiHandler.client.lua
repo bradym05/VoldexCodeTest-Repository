@@ -1,4 +1,4 @@
-local UpdateUI: RemoteEvent = game.ReplicatedStorage.Remotes.UpdateUI
+local UpdateUI : RemoteEvent = game.ReplicatedStorage.Remotes.UpdateUI
 
 local PlayerGui = game:GetService('Players').LocalPlayer:WaitForChild('PlayerGui')
 local ScreenGui = PlayerGui:WaitForChild("ScreenGui")
