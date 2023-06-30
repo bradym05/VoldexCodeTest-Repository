@@ -22,6 +22,8 @@ Other Notes:<br />
 -Removed unnecessary "PreviewArea" part from pads. <br />
 -Enabled "TouchesUseCollisionGroups" setting from workspace for registering pad purchases. <br />
 -Disabled CanQuery and CanTouch on all parts except for Pads and PaycheckMachines. <br />
+-Moved money count GUI to bottom center of screen. <br />
+-Redesigned money count gui. <br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.
 
@@ -43,8 +45,15 @@ PlayerData:<br />
 -Players whose data is saving in another server will be kicked to prevent duplication or data loss<br />
 -Error codes are retrieved and handled uniquely based on the current documentation<br />
 -Active processes are counted to ensure all processes complete on BindToClose<br />
+-All methods like "ArrayInsert" which change data refer back to the "SetData" method to handle all changes in one place<br />
 
 TycoonHandler (PadService replacement): <br />
+
+-First gets DataObjects from PlayerData for new players. <br />
+-Creates tycoons from the TycoonClass module for new players. <br />
+-Cleans up tycoons when players leave. <br />
+-Manages a leaderstats folder for client replication. <br />
+-Leaderstats are simply a reflection of data stored on the server. <br />
 
 -Created a tycoon template to be cloned for each player. <br />
 -Seperated buildings from template to keep only one copy in memory. <br />
@@ -53,3 +62,28 @@ TycoonHandler (PadService replacement): <br />
 -Created a folder named "Tycoons" to hold tycoons. <br />
 -Placed the price BillboardGui in ServerStorage to clone it under each pad. <br />
 -Moved buildings down to connect with ground. <br />
+
+TycoonClass: <br />
+
+-Creates tycoon and moves to the first available slot<br />
+-Loads purchased objects<br />
+-Loads pads after purchased objects to avoid unnecessary connections and keep dependencies accurate<br />
+-Sets collision group of pads to only collide with owner's character (workspace.TouchesUseCollisionGroups must stay enabled)<br />
+-Slots are obtained by yielding if necessary (ex. player joins before a tycoon becomes available)<br />
+-Pads are only connected to onTouched when purchaseable<br />
+-Pads are hidden in ServerStorage until needed or destroyed if not needed<br />
+-Connections are cleaned up as quickly as possible or when tycoon is destroyed<br />
+
+CustomSignal:<br />
+
+-OOP Signal Class to replace use of BindableEvents<br />
+-Creates easy to use "signals"<br />
+-Signals have a "Connect" method accepting a callback function and returning a connection class<br />
+-Connection class can be disconnected just like a RBXScriptConnection<br />
+-Signals can be fired to run all callback functions with any arguments<br />
+-Signals can be destroyed to disconnect all connections<br />
+
+InterfaceHandler (UiHandler refactored):<br />
+
+-Updates money count based on leaderstats. <br />
+-Animates money count value on change. <br />

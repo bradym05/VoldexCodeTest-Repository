@@ -12,6 +12,10 @@ MemoryStoreService is used for session locking, preventing data from saving on m
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local MemoryStoreService = game:GetService("MemoryStoreService")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+--Modules
+local CustomSignal = require(ServerScriptService:WaitForChild("CustomSignal"))
 
 --Current save
 local SaveFile = DataStoreService:GetDataStore("Save1234567")
@@ -252,6 +256,7 @@ function DataObject.new(Player : Player)
     self.lastGet = os.clock() - CACHE_TIME -- Prevent unnecessary requests (subtract CACHE_TIME to allow for initial read)
     self.changed = false
     self.inMemory = false -- Prevent unnecessary attempts to remove player from memory
+    self.signals = {}
     setmetatable(self, DataObject)
 
     --// INITIAL SETUP CODE \\--
@@ -306,6 +311,13 @@ function DataObject:Destroy(dontSave : boolean)
         --Set to false because request is processing
         self.inMemory = false
         retryAny(SaveStore, "RemoveAsync", 0, self.Key)
+    end
+    --Destroy custom signals
+    for _, signal in pairs(self.signals) do
+        --Make sure signal is not already destroyed
+        if signal and not table.isfrozen(signal) then
+            signal:Destroy()
+        end
     end
     --Clean up self
     table.clear(self)
@@ -363,12 +375,27 @@ function DataObject:SetData(key : String, value : any) : boolean
         self.changed = true
         --Set the value
         self.Data[key] = value
+        --Fire custom signal if connected
+        if self.signals[key] then
+            --Send new value of data
+            self.signals[key]:Fire(value)
+        end
         return true
     else
         --Warn that data is not valid
         warn("The value: ", value, " cannot be saved.")
         return false
     end
+end
+
+--Allow external scripts to listen to specific data changes 
+function DataObject:ListenToChange(key : String, callback : any)
+    --Get custom signal
+    if not self.signals[key] then
+        self.signals[key] = CustomSignal.new()
+    end
+    --Return connection
+    return self.signals[key]:Connect(callback)
 end
 
 --Increment number values

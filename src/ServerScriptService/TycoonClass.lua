@@ -31,6 +31,7 @@ local padsGroupSuffix = "_Pads"
 --Manipulated
 local availableSlots = {}
 local cachedBuildings = {}
+local tycoonQueue = {}
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
@@ -38,6 +39,24 @@ local cachedBuildings = {}
 local function translateCFrame(originalCFrame : CFrame, slot : number) : CFrame
     --Calculate
     return originalCFrame + Vector3.new(0, 0, TYCOON_DISTANCE * slot)
+end
+
+--Safely gets the next available tycoon spot, yielding if necessary
+local function getSlot()
+    --Attempt to get slot
+    local slot = next(availableSlots)
+    --Determine if yielding is necessary
+    if not slot then
+        --Create event
+        local onAvailable = Instance.new("BindableEvent")
+        --Add to queue
+        table.insert(tycoonQueue, onAvailable)
+        --Wait for availability
+        slot = onAvailable.Event:Wait()
+        --Clean up
+        onAvailable:Destroy()
+    end
+    return slot
 end
 
 ---------------------// TYCOON CLASS \\-----------------------
@@ -52,8 +71,6 @@ function Tycoon.new(Player : Player)
     self.Player = Player
     --Create a connections table for GC
     self.connections = {}
-    --Get first available slot
-    self.slot = next(availableSlots)
     --Create tycoon
     self.tycoonModel = tycoonTemplate:Clone()
     --Get DataObject
@@ -73,8 +90,13 @@ function Tycoon.new(Player : Player)
 
     --// INITIAL SETUP CODE \\--
 
-    --Remove slot because it is no longer available
-    table.remove(availableSlots, table.find(availableSlots, self.slot))
+    --Get first available slot
+    self.slot = getSlot()
+    --Remove slot because it is no longer available (if not received directly)
+    local slotIndex = table.find(availableSlots, self.slot)
+    if slotIndex then
+        table.remove(availableSlots, slotIndex)
+    end
     --Correctly position tycoon 
     self.tycoonModel:PivotTo(translateCFrame(self.tycoonModel:GetPivot(), self.slot))
     --Name tycoon to UserId and parent
@@ -108,7 +130,7 @@ function Tycoon.new(Player : Player)
     characterAddedConnection = Player.CharacterAdded:Connect(function(character : Model)
         self:CharacterAdded(character)
     end)
-    --Add to connections
+    --Add to connections for GC
     table.insert(self.connections, characterAddedConnection)
     --Make sure that the first character is moved and loaded
     task.spawn(function()
@@ -131,7 +153,14 @@ function Tycoon:Destroy()
     PhysicsService:UnregisterCollisionGroup(self.characterGroup)
     PhysicsService:UnregisterCollisionGroup(self.padsGroup)
     --Indicate slot availability
-    table.insert(availableSlots, self.slot)
+    if #tycoonQueue > 0 then
+        --Notify
+        tycoonQueue[1]:Fire(self.slot)
+        --Remove from queue
+        table.remove(tycoonQueue, 1)
+    else
+        table.insert(availableSlots, self.slot)
+    end
     --Destroy tycoon instance
     self.tycoonModel:Destroy()
     self.tycoonModel = nil
@@ -194,7 +223,8 @@ function Tycoon:ActivatePad(Pad : Model, target : String)
     --Set collision group to pads
     touchPart.CollisionGroup = self.padsGroup
     --Register purchase attempts (no need to check hit because only character can collide)
-    touchPart.Touched:Connect(function()
+    local touched
+    touched = touchPart.Touched:Connect(function()
         if not debounce then
             --Stop multiple purchase attempts
             debounce = true
@@ -202,6 +232,8 @@ function Tycoon:ActivatePad(Pad : Model, target : String)
             local money = self.DataObject:GetData("Money")
             --Check sufficient funds
             if money >= price then
+                --No need to keep touched event connected
+                touched:Disconnect()
                 --Subtract price from player's money
                 self.DataObject:IncrementData("Money", -price)
                 --Save purchase

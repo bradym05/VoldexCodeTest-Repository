@@ -20,6 +20,11 @@ PlayerData.TEMPLATE = {
     Paycheck = 100,
 }
 
+--Settings
+local REPLICATED_STATS = { --Put the names and value ClassNames of data to be included in leaderstats here
+    Money = "IntValue",
+}
+
 --Manipulated
 local playerToTycoon = {}
 
@@ -34,6 +39,22 @@ local function playerAdded(Player : Player)
         --Create tycoon and reference
         local Tycoon = TycoonClass.new(Player)
         playerToTycoon[Player] = Tycoon
+        --Create leaderstats
+        local leaderstats = Instance.new("Folder")
+        leaderstats.Name = "leaderstats"
+        leaderstats.Parent = Player
+        --Loop through all replicated stats
+        for name : String, ClassName : String in pairs(REPLICATED_STATS) do
+            --Create value object and set loaded value
+            local valueObject = Instance.new(ClassName)
+            valueObject.Name = name
+            valueObject.Value = dataObject:GetData(name)
+            valueObject.Parent = leaderstats
+            --Connect to changes
+            dataObject:ListenToChange(name, function(newValue)
+                valueObject.Value = newValue
+            end)
+        end
     end
 end
 
