@@ -42,6 +42,7 @@ PlayerData:<br />
 -MemoryStoreService is used to refer UserId to a boolean value indicating if that user's data is currently saving<br />
 -Players whose data is saving in another server will be kicked to prevent duplication or data loss<br />
 -Error codes are retrieved and handled uniquely based on the current documentation<br />
+-Active processes are counted to ensure all processes complete on BindToClose<br />
 
 TycoonHandler (PadService replacement): <br />
 
@@ -51,3 +52,4 @@ TycoonHandler (PadService replacement): <br />
 -Removed "isEnabled," and "isFinished" attributes from Pads. <br />
 -Created a folder named "Tycoons" to hold tycoons. <br />
 -Placed the price BillboardGui in ServerStorage to clone it under each pad. <br />
+-Moved buildings down to connect with ground. <br />

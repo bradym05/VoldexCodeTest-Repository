@@ -14,7 +14,7 @@ local Players = game:GetService("Players")
 local MemoryStoreService = game:GetService("MemoryStoreService")
 
 --Current save
-local SaveFile = DataStoreService:GetDataStore("Save123456")
+local SaveFile = DataStoreService:GetDataStore("Save1234567")
 --Active saving store
 local SaveStore = MemoryStoreService:GetSortedMap("Saving")
 
@@ -30,6 +30,7 @@ local CACHE_TIME = 5 -- IMPORTANT: VALUE MUST BE >= 4! Cache time in seconds for
 local requestCounts = {} -- {sent, pending}
 local lastRequest = {}
 local playerToData = {}
+local processes = 0
 
 --Some of the DataStoreRequestType enums refer to multiple requests, translated here
 local translatedRequests = {
@@ -126,6 +127,10 @@ local codeChecks = {
 --Recursively retry any function based on MAX_RETRIES variable and RETRY_DELAY variable
 --Variable "from" refers to a metatable or service, functionName is the function to call
 local function retryAny(from : any, functionName : String, retries : number, ...)
+    --Indicate that request is processing if this is a new request
+    if retries == 0 then
+        processes += 1
+    end
     --Check if retries have exceeded or met the maximum and stop recursing, or continue
     if retries >= MAX_RETRIES then
         return false
@@ -138,6 +143,8 @@ local function retryAny(from : any, functionName : String, retries : number, ...
         end)
         --Check if call was successful
         if success then
+            --Indicate that request finished processing
+            processes -= 1
             --Return values
             return success, result
         else
@@ -194,6 +201,8 @@ function safeManage(requestName : String, ...)
     local requestType = translatedRequests[requestName] or Enum.DataStoreRequestType[requestName]
     --Make sure request is valid before proceeding
     if requestType then
+        --Indicate that a request is processing
+        processes += 1
         --Check if references exist, or check if request limit has reset (once every minute)
         if not lastRequest[requestType] or os.clock() - lastRequest[requestType] >= 60 then
             --Reset
@@ -216,6 +225,8 @@ function safeManage(requestName : String, ...)
             --Wait until budget resets (additional 5 seconds to be safe)
             task.wait(os.clock() - lastRequest[requestType] + additionalTime + 5)
         end
+        --Indicate that request finished
+        processes -= 1
         --Return results
         return request(requestName, requestType, ...)
     end
@@ -240,10 +251,11 @@ function DataObject.new(Player : Player)
     self.Key = tostring(Player.UserId) -- Store string UserId in case player leaves before operation
     self.lastGet = os.clock() - CACHE_TIME -- Prevent unnecessary requests (subtract CACHE_TIME to allow for initial read)
     self.changed = false
+    self.inMemory = false -- Prevent unnecessary attempts to remove player from memory
     setmetatable(self, DataObject)
 
     --// INITIAL SETUP CODE \\--
-    
+
     --Get value of UserId key from SaveStore to determine if data is saving in another server
     local getSuccess, getResult = retryAny(SaveStore, "GetAsync", 0, self.Key)
     --Check if value was successfully retrieved
@@ -263,6 +275,8 @@ function DataObject.new(Player : Player)
     end
     --Set value of UserId key to true in SaveStore with an expiration time of one week (604800 seconds)
     retryAny(SaveStore, "SetAsync", 0, self.Key, true, 604800) 
+    --Indicate that player is now in memory
+    self.inMemory = true
     --Get initial data
     self:Read()
     --Reconcile data if it doesn't exist
@@ -287,8 +301,12 @@ function DataObject:Destroy(dontSave : boolean)
     if not dontSave then
         self:Update()
     end
-    --Remove from MemoryStore
-    retryAny(SaveStore, "RemoveAsync", 0, self.Key)
+    --Remove from MemoryStore if player is in memory
+    if self.inMemory then
+        --Set to false because request is processing
+        self.inMemory = false
+        retryAny(SaveStore, "RemoveAsync", 0, self.Key)
+    end
     --Clean up self
     table.clear(self)
     setmetatable(self,nil)
@@ -414,8 +432,17 @@ end)
 --Save on close
 game:BindToClose(function()
     for _, PlayerDataObject in pairs(playerToData) do
-        task.spawn(PlayerDataObject.Update, PlayerDataObject) -- PlayerDataObject is needed as a parameter when indexing function
+        if PlayerDataObject.inMemory then
+            --Make sure seperate requests to remove from memory are not made
+            PlayerDataObject.inMemory = false
+            --Remove from memory
+            task.spawn(retryAny, SaveStore, "RemoveAsync", 0, PlayerDataObject.Key)
+        end
+        -- PlayerDataObject is needed as a parameter when indexing function
+        task.spawn(PlayerDataObject.Update, PlayerDataObject)
     end
+    --Wait for all active processes to finish before server closes
+    repeat task.wait() until processes <= 0
 end)
 
 return DataObject

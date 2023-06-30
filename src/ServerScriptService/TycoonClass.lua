@@ -1,5 +1,6 @@
 --[[
 This module initializes an OOP Tycoon class for ease of use and organization. The Tycoon class handles appearance, related events, and loading data.
+Pad dependencies must refer to the purchaseable building. Multiple pads may be dependent on the same object. Pad names do not matter.
 
 --]]
 
@@ -35,8 +36,6 @@ local cachedBuildings = {}
 
 --Translates cframes based on tycoon slot (stored as a function incase translation ever changes)
 local function translateCFrame(originalCFrame : CFrame, slot : number) : CFrame
-    --Account for offset of tycoon
-    slot -= 1
     --Calculate
     return originalCFrame + Vector3.new(0, 0, TYCOON_DISTANCE * slot)
 end
@@ -66,13 +65,22 @@ function Tycoon.new(Player : Player)
     self.purchasedFolder = self.tycoonModel:WaitForChild("Purchased")
     --Create table to refer buildings to dependent pad(s)
     self.buildingToDependency = {}
+    --Create folder to hold hidden pads
+    self.padStorage = Instance.new("Folder")
+    self.padStorage.Name = self.DataObject.Key.."_Storage"
+    self.padStorage.Parent = game.ServerStorage
     setmetatable(self, Tycoon)
 
     --// INITIAL SETUP CODE \\--
 
     --Remove slot because it is no longer available
     table.remove(availableSlots, table.find(availableSlots, self.slot))
-    --Load purchased buildings
+    --Correctly position tycoon 
+    self.tycoonModel:PivotTo(translateCFrame(self.tycoonModel:GetPivot(), self.slot))
+    --Name tycoon to UserId and parent
+    self.tycoonModel.Name = self.DataObject.Key
+    self.tycoonModel.Parent = tycoonsFolder
+    --Load purchased buildings (after pivot)
     self:Fulfill(self.DataObject:GetData("Purchased") or {}, false)
     --Initialize pads (after purchases have loaded)
     for _, Pad : Model in pairs(self.tycoonModel.Pads:GetChildren()) do
@@ -93,11 +101,6 @@ function Tycoon.new(Player : Player)
             PhysicsService:CollisionGroupSetCollidable(self.padsGroup, otherGroup, false)
         end
     end
-    --Correctly position tycoon (increment 1 to account for Offset after pivotting)
-    self.tycoonModel:PivotTo(translateCFrame(self.tycoonModel:GetPivot(), self.slot + 1))
-    --Name tycoon to UserId and parent
-    self.tycoonModel.Name = self.DataObject.Key
-    self.tycoonModel.Parent = tycoonsFolder
     --Set respawn location
     Player.RespawnLocation = self.tycoonModel.Essentials.SpawnLocation
     --Connect Tycoon:CharacterAdded() to Player.CharacterAdded
@@ -131,6 +134,10 @@ function Tycoon:Destroy()
     table.insert(availableSlots, self.slot)
     --Destroy tycoon instance
     self.tycoonModel:Destroy()
+    self.tycoonModel = nil
+    --Destroy pad storage folder
+    self.padStorage:Destroy()
+    self.padStorage = nil
     --Disconnect any active connections
     for _, connection : RBXScriptConnection in pairs(self.connections) do
         --Check that connection is active and disconnect
@@ -178,6 +185,8 @@ end
 
 --Pad functionality for purchases
 function Tycoon:ActivatePad(Pad : Model, target : String)
+    --Unhide pad
+    Pad.Parent = self.tycoonModel.Pads
     --Initialize variables
     local price = Pad:GetAttribute("Price")
     local touchPart = Pad:WaitForChild("Pad")
@@ -197,9 +206,13 @@ function Tycoon:ActivatePad(Pad : Model, target : String)
                 self.DataObject:IncrementData("Money", -price)
                 --Save purchase
                 self.DataObject:ArrayInsert("Purchased", target)
+                --Destroy pad
+                Pad:Destroy()
                 --Fulfill purchase
                 self:Fulfill(target)
             end
+            --Allow retry
+            debounce = false
         end
     end)
 end
@@ -220,6 +233,8 @@ function Tycoon:PadSetup(Pad : Model)
     if not dependency or self.purchasedFolder:FindFirstChild(dependency) then
         self:ActivatePad(Pad, target)
     else
+        --Hide pad
+        Pad.Parent = self.padStorage
         --Check if dependency table exists
         if not self.buildingToDependency[dependency] then
             --Create table
