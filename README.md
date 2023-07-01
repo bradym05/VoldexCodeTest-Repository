@@ -25,6 +25,14 @@ Other Notes:<br />
 -Moved money count GUI to bottom center of screen. <br />
 -Redesigned money count gui. <br />
 -Redesigned price label gui. <br />
+-Regrouped and renamed ship parts to be purchased as part of the tycoon. <br />
+-Set all RenderFidelity settings to automatic. <br />
+-Turned on StreamingEnabled. <br />
+-Updated CollisionFidelities and model streaming modes. <br />
+-Renamed pad components. <br />
+-Created sound group for game. <br />
+-Created sound group for GUI. <br />
+-Created new beam textures and restructured beams. <br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.
 
@@ -81,6 +89,8 @@ TycoonClass: <br />
 -Underscores in object names are converted to spaces for display. <br />
 -PaycheckMachine increments player's money and resets money available for collection when touched. <br />
 -Player's receive their paychecks via one core loop every 5 seconds instead of indiviudal loops for each tycoon. <br />
+-Pad purchase attempts fire an event to the player to animate the pad. <br />
+-Pads are destroyed after 5 seconds to give player's time for animation. <br />
 
 CustomSignal:<br />
 
@@ -90,8 +100,50 @@ CustomSignal:<br />
 -Connection class can be disconnected just like a RBXScriptConnection<br />
 -Signals can be fired to run all callback functions with any arguments<br />
 -Signals can be destroyed to disconnect all connections<br />
+-Connections can be automatically disconnected after firing using Once()
+-Wait can be used to connect using Once() and yield until fired
 
 InterfaceHandler (UiHandler refactored):<br />
 
 -Updates money count based on leaderstats. <br />
 -Animates money count value on change. <br />
+
+Animations:<br />
+
+QuickSound:<br />
+
+-Module to play one time sounds and handle clean up in one place.<br />
+-Takes a parent for the sound or a CFrame, or neither.<br />
+-Creates a part to play sounds from if a CFrame is provided. <br />
+-Attachments are created and CFramed inside of the sound part to play the sounds from (instead of creating a new part for each sound). <br />
+-If no parent or CFrame is provided, sounds will be played from SoundService. <br />
+-If no SoundGroup is provided, one will be assigned automatically based on where the sound is parented. <br />
+-Applies default properties, if requested, for consistency. <br />
+
+TweenAny:<br />
+
+-Module to "tween" instances that are not usually tweenable.<br />
+-Uses a single RenderStepped connection to iterate over lerp all active tweens.<br />
+-Flips start and end goal to reverse tweens if set.<br />
+-Cleans up completed tweens.<br />
+-Reconnects and disconnects from RunService dynamically depending on if any tweens are active.<br />
+
+-TweenModel Method:<br />
+-Returns a function to refer models to the given info in a private dictionary.<br />
+-Pivots models to lerped CFrame.<br />
+
+-TweenSequence Method:<br />
+-Returns a function to refer instances to the start values and tween info in a private dictionary.<br />
+-Gets values of keypoints and creates new keypoints with lerped values.<br />
+-Creates a new sequence and sets original property to lerped sequence.<br />
+
+QuickTween:<br />
+
+-Module to do one time tweens.<br />
+-Returns completed signal and destroys tweens after completion.<br />
+
+ParticleHandler:<br />
+
+-Stores base particle effect for use across multiple locations. <br />
+-Adjusts emit counts based off of distance from camera and multiplier setting. <br />
+-Automatically deletes created particles after use unless reused in the same location. <br />

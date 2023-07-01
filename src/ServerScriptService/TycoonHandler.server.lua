@@ -45,7 +45,7 @@ local function playerAdded(Player : Player)
         leaderstats.Name = "leaderstats"
         leaderstats.Parent = Player
         --Loop through all replicated stats
-        for name : String, ClassName : String in pairs(REPLICATED_STATS) do
+        for name : string, ClassName : string in pairs(REPLICATED_STATS) do
             --Create value object and set loaded value
             local valueObject = Instance.new(ClassName)
             valueObject.Name = name

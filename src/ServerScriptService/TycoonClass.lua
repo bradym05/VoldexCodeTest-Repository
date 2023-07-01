@@ -10,7 +10,7 @@ Pad dependencies must refer to the purchaseable building. Multiple pads may be d
 local ServerStorage = game:GetService("ServerStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local PhysicsService = game:GetService("PhysicsService")
-local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --Modules
 local PlayerData = require(ServerScriptService:WaitForChild("PlayerData"))
@@ -20,10 +20,13 @@ local tycoonsFolder = workspace:WaitForChild("Tycoons")
 local tycoonBuildings = ServerStorage:WaitForChild("Buildings")
 local tycoonTemplate = ServerStorage:WaitForChild("TycoonBase")
 local priceLabelTemplate = ServerStorage:WaitForChild("PriceLabel")
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local padTouchedRemote = remotes:WaitForChild("PadTouched")
 
 --Settings
 local TYCOON_DISTANCE = 300 --Studs between tycoons
 local MAX_TYCOONS = 4 --Max tycoons per server
+local PAYOUT_INTERVAL = 5 --Seconds between payouts
 
 --Collision group name suffixes (prefix is UserId)
 local characterGroupSuffix = "_Character"
@@ -259,7 +262,7 @@ function Tycoon:CharacterAdded(character : Model)
 end
 
 --Pad functionality for purchases
-function Tycoon:ActivatePad(Pad : Model, target : String)
+function Tycoon:ActivatePad(Pad : Model, target : string)
     --Unhide pad
     Pad.Parent = self.tycoonModel.Pads
     --Initialize variables
@@ -294,14 +297,23 @@ function Tycoon:ActivatePad(Pad : Model, target : String)
             if money >= price then
                 --No need to keep touched event connected
                 touched:Disconnect()
+                --Tell player to animate pad purchase
+                padTouchedRemote:FireClient(self.Player, Pad, true)
                 --Subtract price from player's money
                 self.DataObject:IncrementData("Money", -price)
                 --Save purchase
                 self.DataObject:ArrayInsert("Purchased", target)
-                --Destroy pad
-                Pad:Destroy()
+                --Destroy pad after 5 seconds to give player time to animate
+                task.delay(5, function()
+                    Pad:Destroy()
+                end)
                 --Fulfill purchase
                 self:Fulfill(target)
+            else
+                --Tell player to animate pad purchase failed
+                padTouchedRemote:FireClient(self.Player, Pad, false)
+                --Cooldown time
+                task.wait(0.5)
             end
             --Allow retry
             debounce = false
@@ -344,7 +356,7 @@ function Tycoon:Fulfill(purchased : any)
         purchased = {purchased}
     end
     --Loop through new purchases
-    for _, buildingName : String in pairs(purchased) do
+    for _, buildingName : string in pairs(purchased) do
         --Get cached building before using FindFirstChild (faster)
         local building = cachedBuildings[buildingName] or tycoonBuildings:FindFirstChild(buildingName)
         --Set cache
@@ -376,7 +388,7 @@ end
 --Interval paycheck loop
 task.spawn(function()
     while true do
-        task.wait(5)
+        task.wait(PAYOUT_INTERVAL)
         --Loop all payout functions at once instead of multiple loops
         for _, payoutFunction in pairs(paychecks) do
             payoutFunction()

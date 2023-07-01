@@ -6,6 +6,14 @@ The connection class adds the disconnect functionality to signals, the system is
 
 --]]
 
+------------------// PRIVATE FUNCTIONS \\------------------
+
+--Convert arguments to a table safely to be stored as a variable (... can only be accessed from outside of its nested closure)
+local function packArgs(...)
+    --Converts tuple into a table without missing any values (like nil)
+    return {n = select("#", ...), ...}
+end
+
 ----------------------// CONNECTION \\-----------------------
 local Connection = {}
 Connection.__index = Connection
@@ -67,6 +75,29 @@ function Signal:Connect(callback : any)
     return connection
 end
 
+--Connect and disconnect after fired
+function Signal:Once(callback : any)
+    --Get connection
+    local connection = self:Connect(callback)
+end
+
+--Connect via Once() and yield until fired
+function Signal:Wait(maxTime : number)
+    --Connect a function to grab returned values
+    local returnedTable
+    self:Once(function(...)
+        returnedTable = packArgs(...)
+    end)
+    local elapsed = 0
+    --Yield until fired
+    repeat
+        --Increment elapsed by change in time
+        elapsed += task.wait()
+    until returnedTable or elapsed >= maxTime or not self or table.isfrozen(self)
+    --Return original tuple or false if maximum wait exceeded
+    return (returnedTable and unpack(returnedTable)) or false
+end
+
 --Fires all arguments to listeners
 function Signal:Fire(...)
     --Loop through listeners
@@ -74,6 +105,14 @@ function Signal:Fire(...)
         --Run
         task.spawn(callback, ...)
     end
+end
+
+--Fire signal and destroy immediately after
+function Signal:FireOnce(...)
+    --Fire
+    self:Fire(...)
+    --Destroy
+    self:Destroy()
 end
 
 --Clean up

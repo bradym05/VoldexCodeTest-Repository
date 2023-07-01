@@ -12,13 +12,13 @@ MemoryStoreService is used for session locking, preventing data from saving on m
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local MemoryStoreService = game:GetService("MemoryStoreService")
-local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --Modules
-local CustomSignal = require(ServerScriptService:WaitForChild("CustomSignal"))
+local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 
 --Current save
-local SaveFile = DataStoreService:GetDataStore("Save123456789")
+local SaveFile = DataStoreService:GetDataStore("Save_1")
 --Active saving store
 local SaveStore = MemoryStoreService:GetSortedMap("Saving")
 
@@ -130,7 +130,7 @@ local codeChecks = {
 
 --Recursively retry any function based on MAX_RETRIES variable and RETRY_DELAY variable
 --Variable "from" refers to a metatable or service, functionName is the function to call
-local function retryAny(from : any, functionName : String, retries : number, ...)
+local function retryAny(from : any, functionName : string, retries : number, ...)
     --Indicate that request is processing if this is a new request
     if retries == 0 then
         processes += 1
@@ -161,7 +161,7 @@ local function retryAny(from : any, functionName : String, retries : number, ...
 end
 
 --Safely handles DataStoreService requests by determining the best course of action based on error codes
-local function request(requestName : String, requestType : Enum.DataStoreRequestType, ...)
+local function request(requestName : string, requestType : Enum.DataStoreRequestType, ...)
     --Store arguments for use in pcall
     local args = packArgs(...)
     --Check if this is a retry and get number of retries
@@ -200,7 +200,7 @@ end
 --Ensures that DataStore requests stay within budget
 --Although DataStoreService has its own throttling queue, there is a limit for the number of items in queue, which means data is lost when exceeded
 --DataStoreService's request throttling also processes requests out of order, which is not ideal
-function safeManage(requestName : String, ...)
+function safeManage(requestName : string, ...)
     --Get request type
     local requestType = translatedRequests[requestName] or Enum.DataStoreRequestType[requestName]
     --Make sure request is valid before proceeding
@@ -363,12 +363,12 @@ function DataObject:Update() : boolean
 end
 
 --Get data from DataObject
-function DataObject:GetData(key : String) : string | number | boolean | table
+function DataObject:GetData(key : string) : string | number | boolean | table
     return key and self.Data[key]
 end
 
 --Set data to DataObject
-function DataObject:SetData(key : String, value : any) : boolean
+function DataObject:SetData(key : string, value : any) : boolean
     --Check if data is valid
     if checkValue(value) then
         --Indicate a change has occured
@@ -389,7 +389,7 @@ function DataObject:SetData(key : String, value : any) : boolean
 end
 
 --Allow external scripts to listen to specific data changes 
-function DataObject:ListenToChange(key : String, callback : any)
+function DataObject:ListenToChange(key : string, callback : any)
     --Get custom signal
     if not self.signals[key] then
         self.signals[key] = CustomSignal.new()
@@ -399,7 +399,7 @@ function DataObject:ListenToChange(key : String, callback : any)
 end
 
 --Increment number values
-function DataObject:IncrementData(key : String, inc : number) : boolean
+function DataObject:IncrementData(key : string, inc : number) : boolean
     --Get initial value
     local initialValue = self:GetData(key)
     --Check that value is a number
@@ -412,7 +412,7 @@ function DataObject:IncrementData(key : String, inc : number) : boolean
 end
 
 --Insert into table values
-function DataObject:ArrayInsert(key : String, value : any) : boolean
+function DataObject:ArrayInsert(key : string, value : any) : boolean
     --Get initial value
     local inititalTable = self:GetData(key)
     --Check that value is a table
@@ -426,7 +426,7 @@ function DataObject:ArrayInsert(key : String, value : any) : boolean
 end
 
 --Remove values from tables
-function DataObject:ArrayRemove(key : String, value : any) : boolean
+function DataObject:ArrayRemove(key : string, value : any) : boolean
     --Get initial value
     local inititalTable = self:GetData(key)
     --Check that value is a table
