@@ -114,7 +114,7 @@ particlePart.CanCollide = false
 particlePart.CanQuery = false
 particlePart.CanTouch = false
 particlePart.Transparency = 1
-particlePart.Name = "SoundPart"
+particlePart.Name = "ParticlePart"
 particlePart.Parent = workspace
 
 return Particle

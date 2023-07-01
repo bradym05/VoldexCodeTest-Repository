@@ -110,6 +110,15 @@ InterfaceHandler (UiHandler refactored):<br />
 
 Animations:<br />
 
+-Listens to event when pad is pressed.<br />
+-Plays sound and pressed animation.<br />
+-Tweens color of pad and beams to red if purchase fails.<br />
+-Sinks pad into ground and emits coin particles if purchase succeeds.<br />
+-Plays purchase sound from pad.<br />
+
+-Listens to ChildAdded in tycoon buildings folder.<br />
+-Animates new buildings by moving them to a random location and tweening back.<br />
+
 QuickSound:<br />
 
 -Module to play one time sounds and handle clean up in one place.<br />

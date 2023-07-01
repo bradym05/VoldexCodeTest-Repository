@@ -3,6 +3,7 @@
 --Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
 
 --Modules
 local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
@@ -11,6 +12,11 @@ local TweenAny = require(ReplicatedStorage:WaitForChild("TweenAny"))
 local ParticleHandler = require(ReplicatedStorage:WaitForChild("ParticleHandler"))
 
 --Instances
+local player = Players.LocalPlayer
+local tycoons = workspace:WaitForChild("Tycoons")
+local playerTycoon = tycoons:WaitForChild(tostring(player.UserId))
+local buildings = playerTycoon:WaitForChild("Purchased")
+
 local particles = ReplicatedStorage:WaitForChild("Particles")
 local sounds = ReplicatedStorage:WaitForChild("Sounds")
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -22,6 +28,7 @@ local PURCHASE_FAIL = sounds:WaitForChild("Error") -- Sound played upon failed p
 local PURCHASE_SOUNDS = sounds:WaitForChild("Purchase"):GetChildren() -- Folder of sounds to choose randomly when purchased
 local PAD_SINK = 4 -- Studs that pads will sink into the ground on purchase
 local PURCHASE_EMIT = 20 -- Particles to emit on purchase
+local BUILDING_RANDOMNESS = 25 -- Max distance parts of a building will disperse to when animated
 
 --Tween Settings
 local buttonTF = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, 0, true)
@@ -29,6 +36,8 @@ local buttonFailGoal = {Color =Color3.new(1,0,0)}
 
 local padTransparencyTF = TweenInfo.new(0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 local padTransparencyGoal = {Transparency = 1}
+
+local buildingTF = TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.InOut)
 
 --Particles
 local coinExplosion = ParticleHandler.new(particles:WaitForChild("CoinExplosion"))
@@ -99,3 +108,49 @@ padTouchedRemote.OnClientEvent:Connect(function(Pad : Model, purchased : boolean
         QuickSound(PURCHASE_FAIL, padButton, true)
     end
 end)
+
+----------------// TYCOON BUILD ANIMATION \\---------------
+
+local function animatePart(part : BasePart)
+    if part:IsA("BasePart") then
+        --Store original values as goal
+        local goal = {Transparency = part.Transparency, Size = part.Size, ["CFrame"] = part.CFrame}
+        --Move to random location
+        local positionOffset = Vector3.new(math.random(-BUILDING_RANDOMNESS,BUILDING_RANDOMNESS),math.random(-BUILDING_RANDOMNESS,BUILDING_RANDOMNESS),math.random(-BUILDING_RANDOMNESS,BUILDING_RANDOMNESS))
+        local rotationOffset = CFrame.Angles(math.rad(math.random(0,360)),math.rad(math.random(0,360)),math.rad(math.random(0,360)))
+        part.CFrame = part.CFrame * rotationOffset + positionOffset
+        --Make random size
+        part.Size = part.Size * math.random(5,10)/10
+        --Make transparent
+        part.Transparency = 1
+        --Store original CanCollide value and disable CanCollide
+        local wasCollideable = part.CanCollide
+        part.CanCollide = false
+        --Tween
+        QuickTween(part, buildingTF, goal):Once(function()
+            --Make sure all values are exact
+            for propertyName, propertyValue in pairs(goal) do
+                part[propertyName] = propertyValue
+            end
+            --Reset CanCollide
+            part.CanCollide = wasCollideable
+        end)
+    end
+end
+
+--Function to animate building on purchased
+local function animateBuilding(building : Model)
+    --Animate existing parts
+    for _, part in pairs(building:GetDescendants()) do
+        animatePart(part)
+    end
+    --Animate newly added parts
+    local descendantAddedConnection = building.DescendantAdded:Connect(animatePart)
+    --Disconnect after 5 seconds
+    task.delay(5, function()
+        descendantAddedConnection:Disconnect()
+    end)
+end
+
+--Connect to animate new buildings
+buildings.ChildAdded:Connect(animateBuilding)
