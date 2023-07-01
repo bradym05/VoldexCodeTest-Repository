@@ -10,6 +10,7 @@ Pad dependencies must refer to the purchaseable building. Multiple pads may be d
 local ServerStorage = game:GetService("ServerStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local PhysicsService = game:GetService("PhysicsService")
+local RunService = game:GetService("RunService")
 
 --Modules
 local PlayerData = require(ServerScriptService:WaitForChild("PlayerData"))
@@ -32,6 +33,7 @@ local padsGroupSuffix = "_Pads"
 local availableSlots = {}
 local cachedBuildings = {}
 local tycoonQueue = {}
+local paychecks = {}
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
@@ -123,6 +125,8 @@ function Tycoon.new(Player : Player)
             PhysicsService:CollisionGroupSetCollidable(self.padsGroup, otherGroup, false)
         end
     end
+    --Initialize Paycheck Machince
+    self:PaycheckSetup()
     --Set respawn location
     Player.RespawnLocation = self.tycoonModel.Essentials.SpawnLocation
     --Connect Tycoon:CharacterAdded() to Player.CharacterAdded
@@ -149,6 +153,8 @@ end
 
 --Clean up
 function Tycoon:Destroy()
+    --Remove from payout loop
+    paychecks[self] = nil
     --Remove collision groups
     PhysicsService:UnregisterCollisionGroup(self.characterGroup)
     PhysicsService:UnregisterCollisionGroup(self.padsGroup)
@@ -182,6 +188,46 @@ function Tycoon:Destroy()
     table.clear(self)
     setmetatable(self, nil)
     table.freeze(self)
+end
+
+--Set up paychecks and collection
+function Tycoon:PaycheckSetup()
+    --Initialize variables
+    local paycheckMachine = self.tycoonModel:WaitForChild("PaycheckMachine")
+    local moneyLabel = paycheckMachine:WaitForChild("Money_Info_Text"):WaitForChild("SurfaceGui"):WaitForChild("MoneyLabel")
+    local touchPart = paycheckMachine:WaitForChild("PadComponents"):WaitForChild("Pad")
+    local debounce = false
+    --Set collision group of pad
+    touchPart.CollisionGroup = self.padsGroup
+    --Connect to touched
+    local touched
+    touched = touchPart.Touched:Connect(function()
+        if not debounce then
+            --Stop player from collecting paycheck more than once
+            debounce = true
+            --Increment player money by player money to collect
+            self.DataObject:IncrementData("Money", self.DataObject:GetData("MoneyToCollect"))
+            --Reset money to collect
+            self.DataObject:SetData("MoneyToCollect", 0)
+            --Allow next collection
+            debounce = false
+        end
+    end)
+    --Set initial appearance to initial money to collect
+    moneyLabel.Text = "$ "..tostring(self.DataObject:GetData("MoneyToCollect"))
+    --Set appearance when money to collect changes
+    local collectChanged
+    collectChanged = self.DataObject:ListenToChange("MoneyToCollect", function(newValue : number)
+        moneyLabel.Text = "$ "..tostring(newValue)
+    end)
+    --Connect to core paycheck loop
+    paychecks[self] = function()
+        --Increment MoneyToCollect by Paycheck stat
+        self.DataObject:IncrementData("MoneyToCollect", self.DataObject:GetData("Paycheck"))
+    end
+    --Add connections to local connections table for GC
+    table.insert(self.connections, touched)
+    table.insert(self.connections, collectChanged)
 end
 
 --Sets CollisionGroup of entire character securely
@@ -220,6 +266,20 @@ function Tycoon:ActivatePad(Pad : Model, target : String)
     local price = Pad:GetAttribute("Price")
     local touchPart = Pad:WaitForChild("Pad")
     local debounce = false
+    --Create price label
+    local priceLabel = priceLabelTemplate:Clone()
+    local priceText = priceLabel:WaitForChild("PriceFrame"):WaitForChild("PriceLabel")
+    local titleText = priceLabel:WaitForChild("TitleLabel")
+    --Display price, or "FREE" if price is 0
+    if price == 0 then
+        priceText.Text = "FREE"
+    else
+        priceText.Text = "$ "..tostring(price)
+    end
+    --Display object name and replace underscores with spaces
+    titleText.Text = string.gsub(target, "_", " ")
+    --Set parent
+    priceLabel.Parent = touchPart
     --Set collision group to pads
     touchPart.CollisionGroup = self.padsGroup
     --Register purchase attempts (no need to check hit because only character can collide)
@@ -312,5 +372,16 @@ end
 for i = 1, MAX_TYCOONS do
     table.insert(availableSlots, i)
 end
+
+--Interval paycheck loop
+task.spawn(function()
+    while true do
+        task.wait(5)
+        --Loop all payout functions at once instead of multiple loops
+        for _, payoutFunction in pairs(paychecks) do
+            payoutFunction()
+        end
+    end
+end)
 
 return Tycoon

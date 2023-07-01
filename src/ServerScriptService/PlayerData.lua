@@ -18,7 +18,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local CustomSignal = require(ServerScriptService:WaitForChild("CustomSignal"))
 
 --Current save
-local SaveFile = DataStoreService:GetDataStore("Save1234567")
+local SaveFile = DataStoreService:GetDataStore("Save123456789")
 --Active saving store
 local SaveStore = MemoryStoreService:GetSortedMap("Saving")
 

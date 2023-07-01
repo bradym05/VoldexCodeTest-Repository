@@ -45,15 +45,14 @@ end
 
 ------------------------// SIGNAL \\------------------------
 
-local Signal = {
-    listeners = {}, -- Holds all listener callback functions
-    _connections = {}, -- Private connections for clean up
-}
+local Signal = {}
 Signal.__index = Signal
 
 --Signal creation
 function Signal.new()
     local self = {}
+    self.listeners = {} -- Holds all listener callback functions
+    self._connections = {} -- Private connections for clean up
     setmetatable(self, Signal)
     return self
 end
@@ -61,7 +60,7 @@ end
 --Signal connection
 function Signal:Connect(callback : any)
     --Connect to this Signal's listeners
-    local connection = Connection.new(callback, Signal)
+    local connection = Connection.new(callback, self)
     --Add to connections
     table.insert(self._connections, connection)
     --return connection

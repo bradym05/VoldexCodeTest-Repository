@@ -18,6 +18,7 @@ PlayerData.TEMPLATE = {
     Money = 1000,
     Purchased = {},
     Paycheck = 100,
+    MoneyToCollect = 0,
 }
 
 --Settings

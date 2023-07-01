@@ -24,6 +24,7 @@ Other Notes:<br />
 -Disabled CanQuery and CanTouch on all parts except for Pads and PaycheckMachines. <br />
 -Moved money count GUI to bottom center of screen. <br />
 -Redesigned money count gui. <br />
+-Redesigned price label gui. <br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.
 
@@ -54,6 +55,7 @@ TycoonHandler (PadService replacement): <br />
 -Cleans up tycoons when players leave. <br />
 -Manages a leaderstats folder for client replication. <br />
 -Leaderstats are simply a reflection of data stored on the server. <br />
+-Added a saving MoneyToCollect value for Paycheck Machines. <br />
 
 -Created a tycoon template to be cloned for each player. <br />
 -Seperated buildings from template to keep only one copy in memory. <br />
@@ -62,6 +64,8 @@ TycoonHandler (PadService replacement): <br />
 -Created a folder named "Tycoons" to hold tycoons. <br />
 -Placed the price BillboardGui in ServerStorage to clone it under each pad. <br />
 -Moved buildings down to connect with ground. <br />
+-Renamed buildings and pads. <br />
+-Centered tycoon. <br />
 
 TycoonClass: <br />
 
@@ -73,6 +77,10 @@ TycoonClass: <br />
 -Pads are only connected to onTouched when purchaseable<br />
 -Pads are hidden in ServerStorage until needed or destroyed if not needed<br />
 -Connections are cleaned up as quickly as possible or when tycoon is destroyed<br />
+-Pads generate a price label to display price and object to player. <br />
+-Underscores in object names are converted to spaces for display. <br />
+-PaycheckMachine increments player's money and resets money available for collection when touched. <br />
+-Player's receive their paychecks via one core loop every 5 seconds instead of indiviudal loops for each tycoon. <br />
 
 CustomSignal:<br />
 
