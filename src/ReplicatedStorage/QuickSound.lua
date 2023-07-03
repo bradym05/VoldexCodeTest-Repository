@@ -23,9 +23,10 @@ local SOUND_DEFAULTS = { --Default sound properties (if set to default)
 }
 
 --Controlled
-local hasCFrame = { --Instance classes which sounds can inherit CFrame from (https://create.roblox.com/docs/reference/engine/classes/Sound)
+local hasCFrame = { --Some relavant instance classes which sounds can inherit CFrame from (https://create.roblox.com/docs/reference/engine/classes/Sound)
     "BasePart",
     "Attachment",
+    "MeshPart",
 }
 
 --Manipulated

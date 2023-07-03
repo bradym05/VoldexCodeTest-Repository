@@ -2,19 +2,33 @@
 
 --Services
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+
+--Modules
+local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
 
 --Instances
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
 local interface = playerGui:WaitForChild("MainInterface")
 local interfaceMenu = interface:WaitForChild("Menu")
 local interfaceContainer = interfaceMenu:WaitForChild("Container")
 local moneyLabel = interfaceMenu:WaitForChild("MoneyCount")
 local moneyIncLabel = interfaceMenu:WaitForChild("MoneyIncrement")
+
+local popup = interface:WaitForChild("Popup")
+local popupContainer = popup:WaitForChild("Container")
+
 local leaderstats = player:WaitForChild("leaderstats")
 local moneyStat = leaderstats:WaitForChild("Money")
+
+local sounds = ReplicatedStorage:WaitForChild("Sounds")
+local clickSound = sounds:WaitForChild("SingleClick")
+local swishSoundIn = sounds:WaitForChild("SwishIn")
+local swishSoundOut = sounds:WaitForChild("SwishOut")
 
 --Settings
 local MONEY_ANIM_TIME = 0.5 --Time it takes to animate money
@@ -27,13 +41,24 @@ local moneyIncTweenIn = TweenService:Create(moneyIncLabel, moneyIncInTF, {TextTr
 local moneyIncOutTF = TweenInfo.new(MONEY_ANIM_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, true, 0.5)
 local moneyIncTweenOut = TweenService:Create(moneyIncLabel, moneyIncOutTF, moneyOutGoal)
 
+local buttonTF = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+local buttonHoverGoal = {Size = UDim2.new(0.9, 0, 0.9, 0)}
+
+local popupTF = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.InOut)
+local popupTweenIn = TweenService:Create(popup, popupTF, {Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0.268, 0, 0.563, 0)})
+local popupTweenOut = TweenService:Create(popup, popupTF, {Position = UDim2.new(0.5, 0, 1.3, 0), Size = UDim2.new(0.23, 0, 0.54, 0)})
+
 --Manipulated
 local displayMoney = 0
 local connection : RBXScriptConnection
 local lastValue = moneyStat.Value
+local closeTweens = {}
+local popupOpen = false
+local popupFrame
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
+--Money calculation for each frame
 local function updateMoney(start : number, goal : number, elapsed : number) : boolean?
     --Convert anim speed to time and get an alpha of elapsed/time (progress) and keep between 0 and 1
     local alpha = math.clamp(elapsed/(MONEY_ANIM_TIME), 0, 1)
@@ -47,7 +72,97 @@ local function updateMoney(start : number, goal : number, elapsed : number) : bo
     end
 end
 
+--Play a table of tweens
+local function tweenTable(tweens : table)
+    for _, tween : Tween in pairs(tweens) do
+        tween:Play()
+    end
+end
+
+--Open or close popup based on variables
+local function togglePopup(frame : Frame, open : boolean)
+    --Determine correct course of action
+    if popupOpen and frame ~= popupFrame then -- Switch frames if open and frame is different
+        --Switch frames
+        popupFrame.Visible = false
+        frame.Visible = true
+        --Set open
+        popupFrame = frame
+    elseif (frame == popupFrame or open == false) and popupOpen then --Close if frame is toggled twice or open is false and popup is open
+        --Set closed
+        popupOpen = false
+        --Close popup
+        popupTweenOut:Play()
+        --Play other closing tweens
+        tweenTable(closeTweens)
+        --Play swish out
+        QuickSound(swishSoundOut)
+    elseif frame and not popupOpen then --Open if a frame was provided and popup is closed
+        --If a frame was open before hide
+        if popupFrame then
+            popupFrame.Visible = false
+        end
+        --Set visible
+        frame.Visible = true
+        --Set open frame
+        popupFrame = frame
+        --Set open to true
+        popupOpen = true
+        --Open popup
+        popupTweenIn:Play()
+        --Play swish in
+        QuickSound(swishSoundIn)
+    end
+end
+
+--Setup interface buttons
+local function buttonSetup(buttonHolder : Frame)
+    --Initialize variables
+    local imageButton : ImageButton = buttonHolder:WaitForChild("Button")
+    local designatedPopup : Frame = popupContainer:WaitForChild(buttonHolder.Name)
+    local tweenIns = {}
+    local tweenOuts = {}
+    --Create tweens
+    table.insert(tweenIns, TweenService:Create(imageButton, buttonTF, buttonHoverGoal))
+    table.insert(tweenOuts, TweenService:Create(imageButton, buttonTF, {Size = imageButton.Size}))
+    --Custom tweens
+    for _, buttonChild : GuiBase2d in pairs(imageButton:GetChildren()) do
+        --See which children have tweens
+        local goal = buttonChild:GetAttributes()
+        if goal and next(goal) then
+            --Get base values
+            local baseValues = {}
+            for propertyName, _ in pairs(goal) do
+                --Set base values to current property value
+                baseValues[propertyName] = buttonChild[propertyName]
+            end
+            --Create tweens
+            table.insert(tweenIns, TweenService:Create(buttonChild, buttonTF, goal))
+            table.insert(tweenOuts, TweenService:Create(buttonChild, buttonTF, baseValues))
+        end
+    end
+    --Connect activated and hover events
+    imageButton.Activated:Connect(function()
+        --Play click
+        QuickSound(clickSound)
+        --Tween in and open popup
+        tweenTable(tweenIns)
+        togglePopup(designatedPopup)
+        --Set closed tweens
+        closeTweens = tweenOuts
+    end)
+end
+
 ---------------------// PRIVATE CODE \\--------------------
+
+--Setup buttons
+for _, buttonHolder in pairs(interfaceContainer:GetChildren()) do
+    --Make sure this is a button
+    if buttonHolder:IsA("Frame") then
+        --Setup
+        buttonSetup(buttonHolder)
+    end
+end
 
 --Set moneyIncLabel to defaults
 for propertyName : string, propertyValue in pairs(moneyOutGoal) do

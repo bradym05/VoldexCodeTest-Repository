@@ -19,16 +19,23 @@ local buildings = playerTycoon:WaitForChild("Purchased")
 
 local particles = ReplicatedStorage:WaitForChild("Particles")
 local sounds = ReplicatedStorage:WaitForChild("Sounds")
+
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local padTouchedRemote = remotes:WaitForChild("PadTouched")
+
+local buildSounds = sounds:WaitForChild("BuildSounds"):GetChildren()
+local swishSounds = sounds:WaitForChild("SwishSounds"):GetChildren()
+
+local settingsFolder = player:WaitForChild("Settings")
+local buildAnimationsSetting = settingsFolder:WaitForChild("BuildAnimations")
 
 --Settings
 local BUTTON_SOUND = sounds:WaitForChild("ButtonPress") -- Sound played upon stepping on a pad
 local PURCHASE_FAIL = sounds:WaitForChild("Error") -- Sound played upon failed purchase
-local PURCHASE_SOUNDS = sounds:WaitForChild("Purchase"):GetChildren() -- Folder of sounds to choose randomly when purchased
+local PURCHASE_SOUND = sounds:WaitForChild("Purchase") -- Sound played on purchase
 local PAD_SINK = 4 -- Studs that pads will sink into the ground on purchase
 local PURCHASE_EMIT = 20 -- Particles to emit on purchase
-local BUILDING_RANDOMNESS = 25 -- Max distance parts of a building will disperse to when animated
+local BUILDING_RANDOMNESS = 25 -- Used for max distance and max delay of build animation
 
 --Tween Settings
 local buttonTF = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, 0, true)
@@ -36,8 +43,6 @@ local buttonFailGoal = {Color =Color3.new(1,0,0)}
 
 local padTransparencyTF = TweenInfo.new(0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 local padTransparencyGoal = {Transparency = 1}
-
-local buildingTF = TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.InOut)
 
 --Particles
 local coinExplosion = ParticleHandler.new(particles:WaitForChild("CoinExplosion"))
@@ -83,7 +88,7 @@ padTouchedRemote.OnClientEvent:Connect(function(Pad : Model, purchased : boolean
         --Get pad CFrame for sound, particles, and tween
         local padCFrame = Pad:GetPivot()
         --Play random purchase sound
-        QuickSound(PURCHASE_SOUNDS[math.random(1, #PURCHASE_SOUNDS)], padCFrame, true)
+        QuickSound(PURCHASE_SOUND, padCFrame, true)
         --Emit purchase particles
         coinExplosion:Emit(padCFrame, PURCHASE_EMIT)
         --Tween transparency of pad
@@ -126,8 +131,17 @@ local function animatePart(part : BasePart)
         --Store original CanCollide value and disable CanCollide
         local wasCollideable = part.CanCollide
         part.CanCollide = false
+        --Create tween info with a random delay time
+        local delayTime = math.random(0, BUILDING_RANDOMNESS * 3)/100
+        local buildingTF = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.InOut, 0, false, delayTime)
+        --Play random swish sound when tween starts
+        task.delay(delayTime, function()
+            QuickSound(swishSounds[math.random(1, #swishSounds)], part)
+        end)
         --Tween
         QuickTween(part, buildingTF, goal):Once(function()
+            --Play random build sound
+            QuickSound(buildSounds[math.random(1, #buildSounds)], part, true)
             --Make sure all values are exact
             for propertyName, propertyValue in pairs(goal) do
                 part[propertyName] = propertyValue
@@ -140,16 +154,19 @@ end
 
 --Function to animate building on purchased
 local function animateBuilding(building : Model)
-    --Animate existing parts
-    for _, part in pairs(building:GetDescendants()) do
-        animatePart(part)
+    --Check if animations are enabled first
+    if buildAnimationsSetting.Value == true then
+        --Animate existing parts
+        for _, part in pairs(building:GetDescendants()) do
+            animatePart(part)
+        end
+        --Animate newly added parts
+        local descendantAddedConnection = building.DescendantAdded:Connect(animatePart)
+        --Disconnect after 5 seconds
+        task.delay(5, function()
+            descendantAddedConnection:Disconnect()
+        end)
     end
-    --Animate newly added parts
-    local descendantAddedConnection = building.DescendantAdded:Connect(animatePart)
-    --Disconnect after 5 seconds
-    task.delay(5, function()
-        descendantAddedConnection:Disconnect()
-    end)
 end
 
 --Connect to animate new buildings

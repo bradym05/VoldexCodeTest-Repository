@@ -33,8 +33,10 @@ Other Notes:<br />
 -Created sound group for game. <br />
 -Created sound group for GUI. <br />
 -Created new beam textures and restructured beams. <br />
+-Created SetData and GetData remotes for client accessible data. <br />
+-I have added my own sounds from the Toolbox. All sounds are uploaded by Roblox to avoid any copyright issues or future takedowns.<br />
 
-Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.
+Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.<br />
 
 PadService:<br />
 
@@ -56,7 +58,7 @@ PlayerData:<br />
 -Active processes are counted to ensure all processes complete on BindToClose<br />
 -All methods like "ArrayInsert" which change data refer back to the "SetData" method to handle all changes in one place<br />
 
-TycoonHandler (PadService replacement): <br />
+MainHandler (was TycoonHandler) (PadService replacement): <br />
 
 -First gets DataObjects from PlayerData for new players. <br />
 -Creates tycoons from the TycoonClass module for new players. <br />
@@ -75,6 +77,11 @@ TycoonHandler (PadService replacement): <br />
 -Renamed buildings and pads. <br />
 -Centered tycoon. <br />
 
+-Contains a list of settings which can be modified and read by players. <br />
+-Connects to remote event and function allowing players to set and read certain data. <br />
+-Yields player data if not loaded using CustomSignal to prevent errors. <br />
+-Ensures that only accessible data is read and written to. <br />
+
 TycoonClass: <br />
 
 -Creates tycoon and moves to the first available slot<br />
@@ -90,23 +97,28 @@ TycoonClass: <br />
 -PaycheckMachine increments player's money and resets money available for collection when touched. <br />
 -Player's receive their paychecks via one core loop every 5 seconds instead of indiviudal loops for each tycoon. <br />
 -Pad purchase attempts fire an event to the player to animate the pad. <br />
--Pads are destroyed after 5 seconds to give player's time for animation. <br />
+-Pads are destroyed after 5 seconds to give player time for animation. <br />
 
 CustomSignal:<br />
 
 -OOP Signal Class to replace use of BindableEvents<br />
 -Creates easy to use "signals"<br />
--Signals have a "Connect" method accepting a callback function and returning a connection class<br />
--Connection class can be disconnected just like a RBXScriptConnection<br />
--Signals can be fired to run all callback functions with any arguments<br />
--Signals can be destroyed to disconnect all connections<br />
--Connections can be automatically disconnected after firing using Once()
--Wait can be used to connect using Once() and yield until fired
+-Signals have a "Connect" method accepting a callback function and returning a connection class.<br />
+-Connection class can be disconnected just like a RBXScriptConnection.<br />
+-Signals can be fired to run all callback functions with any arguments.<br />
+-Signals can be destroyed to disconnect all connections.<br />
+-Connections can be automatically disconnected after firing using Once().<br />
+-Wait can be used to connect using Once() and yield until fired with an optional MaxTime parameter.<br />
 
 InterfaceHandler (UiHandler refactored):<br />
 
 -Updates money count based on leaderstats. <br />
 -Animates money count value on change. <br />
+-Sets up buttons from the interface container frame. <br />
+-Buttons open a popup frame which has the same name. <br />
+-Buttons may have custom animations via children with attributes which are used as the tween goal. <br />
+-Popup is closed if the open frame button is pressed again. <br />
+-Popup switches frames if open and a seperate button is pressed. <br />
 
 Animations:<br />
 
@@ -117,7 +129,9 @@ Animations:<br />
 -Plays purchase sound from pad.<br />
 
 -Listens to ChildAdded in tycoon buildings folder.<br />
+-Checks build animations setting.<br />
 -Animates new buildings by moving them to a random location and tweening back.<br />
+-Plays building sounds using QuickSound.<br />
 
 QuickSound:<br />
 
@@ -154,5 +168,27 @@ QuickTween:<br />
 ParticleHandler:<br />
 
 -Stores base particle effect for use across multiple locations. <br />
--Adjusts emit counts based off of distance from camera and multiplier setting. <br />
--Automatically deletes created particles after use unless reused in the same location. <br />
+-Adjusts emit counts based off of distance from camera and particle setting. <br />
+-Automatically deletes created particles after use unless immediately reused in the same location. <br />
+
+SettingsHandler:<br />
+
+-Handles the settings popup in the main interface.<br />
+-Creates a slider object for each sound group.<br />
+-Creates a slider object for particle effects.<br />
+-Updates volume of each sound group based on slider.<br />
+-Handles boolean settings with checkboxes.<br />
+-Accesses saved settings initially. <br />
+-Updates settings with remote event. <br />
+-Creates a settings folder inside of the player for external access. <br />
+-Creates values for each setting based on the type of setting. <br />
+
+GUI module:<br />
+
+-Stores OOP classes for reusable Gui components.<br />
+
+-Slider Class:<br />
+-Takes image button and progress bar as parameters.<br />
+-Updates progress appearance based on mouse location.<br />
+-Gets changes in mouse location when held down.<br />
+-Fires signal when value updates.<br />

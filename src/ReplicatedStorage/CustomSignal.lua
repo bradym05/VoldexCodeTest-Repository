@@ -93,7 +93,7 @@ function Signal:Wait(maxTime : number)
     repeat
         --Increment elapsed by change in time
         elapsed += task.wait()
-    until returnedTable or elapsed >= maxTime or not self or table.isfrozen(self)
+    until returnedTable or (maxTime and elapsed >= maxTime) or not self or table.isfrozen(self)
     --Return original tuple or false if maximum wait exceeded
     return (returnedTable and unpack(returnedTable)) or false
 end
