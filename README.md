@@ -35,6 +35,7 @@ Other Notes:<br />
 -Created new beam textures and restructured beams. <br />
 -Created SetData and GetData remotes for client accessible data. <br />
 -I have added my own sounds from the Toolbox. All sounds are uploaded by Roblox to avoid any copyright issues or future takedowns.<br />
+-Parented interface buttons to a canvas group for hover animation.<br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.<br />
 
@@ -95,7 +96,7 @@ TycoonClass: <br />
 -Pads generate a price label to display price and object to player. <br />
 -Underscores in object names are converted to spaces for display. <br />
 -PaycheckMachine increments player's money and resets money available for collection when touched. <br />
--Player's receive their paychecks via one core loop every 5 seconds instead of indiviudal loops for each tycoon. <br />
+-Player's receive their paychecks via one core loop every set interval instead of indiviudal loops for each tycoon. <br />
 -Pad purchase attempts fire an event to the player to animate the pad. <br />
 -Pads are destroyed after 5 seconds to give player time for animation. <br />
 
@@ -119,6 +120,12 @@ InterfaceHandler (UiHandler refactored):<br />
 -Buttons may have custom animations via children with attributes which are used as the tween goal. <br />
 -Popup is closed if the open frame button is pressed again. <br />
 -Popup switches frames if open and a seperate button is pressed. <br />
+-Uses TweenAny, canvas group, and UIGradient to play shine animation and make open frame brighter. <br />
+-Stores a brightness function for each button name to indicate which frame is open. <br />
+-Uses UIStroke to make the size of active button appear larger. <br />
+-Gets default GUI size of GUI objects that should change by device. <br />
+-Updates GUI size and position from initial device or if device changes. <br />
+-Creates a SizeConstraint if size is changed (for tweens). <br />
 
 Animations:<br />
 
@@ -126,6 +133,7 @@ Animations:<br />
 -Plays sound and pressed animation.<br />
 -Tweens color of pad and beams to red if purchase fails.<br />
 -Sinks pad into ground and emits coin particles if purchase succeeds.<br />
+-Beams shoot upwards and fade out if purchase succeeds.<br />
 -Plays purchase sound from pad.<br />
 
 -Listens to ChildAdded in tycoon buildings folder.<br />
@@ -192,3 +200,10 @@ GUI module:<br />
 -Updates progress appearance based on mouse location.<br />
 -Gets changes in mouse location when held down.<br />
 -Fires signal when value updates.<br />
+
+InputDetection:<br />
+
+-Detects changes in UserInputType.<br />
+-Determines device by finding patterns which indicate the device of a given UserInputType.<br />
+-Fires a signal when device type changes.<br />
+-Stores current device.<br />

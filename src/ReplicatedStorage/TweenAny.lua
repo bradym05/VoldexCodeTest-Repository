@@ -38,16 +38,32 @@ local function renderStepped(deltaTime : number)
             else
                 --Lerp sequence
                 for propertyName, propertyValue in pairs(info.StartValue) do
+                    --Initialize variables
+                    local goalKeypoints = info.Goal[propertyName].Keypoints
                     local newKeypoints = {}
+                    local lastValue = goalKeypoints[1]
+                    --Iterate over each base keypoint
                     for index, keypoint in pairs(propertyValue.Keypoints) do
-                        --Lerp value of start keypoint to value of same index goal keypoint
-                        local newValue = keypoint.Value:Lerp(info.Goal[propertyName].Keypoints[index].Value, progress)
+                        --Get last value if goal keypoint doesn't have this index
+                        local goalValue = (goalKeypoints[index] and goalKeypoints[index].Value) or lastValue
+                        --Declare newValue variable
+                        local newValue
+                        --Numbers cannot be lerped, so implement custom lerp if value is a number
+                        if typeof(goalValue) == "number" then
+                            --Lerp value (start value plus difference to goal = goal so difference to goal times alpha = progress)
+                            newValue = keypoint.Value + (goalValue - keypoint.Value)*progress
+                        else
+                            --Lerp value of start keypoint to value of same index goal keypoint
+                            newValue = keypoint.Value:Lerp(goalValue, progress)
+                        end
                         --Create sequence keypoint of same type
                         if typeof(keypoint) == "ColorSequenceKeypoint" then
                             table.insert(newKeypoints, ColorSequenceKeypoint.new(keypoint.Time, newValue))
                         else
-                            table.insert(newKeypoints,NumberSequenceKeypoint.new(keypoint.Time, newValue))
+                            table.insert(newKeypoints, NumberSequenceKeypoint.new(keypoint.Time, newValue))
                         end
+                        --Set last value
+                        lastValue = goalValue
                     end
                     --Create sequence of same type
                     local sequence

@@ -26,7 +26,8 @@ local padTouchedRemote = remotes:WaitForChild("PadTouched")
 --Settings
 local TYCOON_DISTANCE = 300 --Studs between tycoons
 local MAX_TYCOONS = 4 --Max tycoons per server
-local PAYOUT_INTERVAL = 5 --Seconds between payouts
+local PAYOUT_INTERVAL = 2.5 --Seconds between payouts
+local PAD_COOLDOWN = 1 --Cooldown time in seconds between registering pad touched
 
 --Collision group name suffixes (prefix is UserId)
 local characterGroupSuffix = "_Character"
@@ -212,6 +213,10 @@ function Tycoon:PaycheckSetup()
             self.DataObject:IncrementData("Money", self.DataObject:GetData("MoneyToCollect"))
             --Reset money to collect
             self.DataObject:SetData("MoneyToCollect", 0)
+            --Tell player to animate press
+            padTouchedRemote:FireClient(self.Player, paycheckMachine, false, true)
+            --Cooldown time
+            task.wait(PAD_COOLDOWN)
             --Allow next collection
             debounce = false
         end
@@ -313,7 +318,7 @@ function Tycoon:ActivatePad(Pad : Model, target : string)
                 --Tell player to animate pad purchase failed
                 padTouchedRemote:FireClient(self.Player, Pad, false)
                 --Cooldown time
-                task.wait(0.5)
+                task.wait(PAD_COOLDOWN)
             end
             --Allow retry
             debounce = false

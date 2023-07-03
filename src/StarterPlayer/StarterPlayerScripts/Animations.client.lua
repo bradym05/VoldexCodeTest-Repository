@@ -44,6 +44,8 @@ local buttonFailGoal = {Color =Color3.new(1,0,0)}
 local padTransparencyTF = TweenInfo.new(0.75, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 local padTransparencyGoal = {Transparency = 1}
 
+local purchasePressTF = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut) -- Same as buttonTF but no reverse
+
 --Particles
 local coinExplosion = ParticleHandler.new(particles:WaitForChild("CoinExplosion"))
 
@@ -53,7 +55,7 @@ local cache = {}
 ---------------------// PRIVATE CODE \\--------------------
 
 --Pad press animation
-padTouchedRemote.OnClientEvent:Connect(function(Pad : Model, purchased : boolean)
+padTouchedRemote.OnClientEvent:Connect(function(Pad : Model, purchased : boolean, constant : boolean?)
     --Get button instance
     local padButton = Pad:WaitForChild("Skin"):WaitForChild("ButtonComponents"):WaitForChild("Button")
     --Create tween if not created
@@ -63,6 +65,7 @@ padTouchedRemote.OnClientEvent:Connect(function(Pad : Model, purchased : boolean
         --Create cache and tweens
         cache[Pad] = {}
         cache[Pad].Pressed = TweenService:Create(padButton, buttonTF, pressedGoal)
+        cache[Pad].PurchasePressed = TweenService:Create(padButton, purchasePressTF, pressedGoal)
         cache[Pad].Failed = TweenService:Create(padButton, buttonTF, buttonFailGoal)
         --Create table of beams
         cache[Pad].Beams = {}
@@ -72,22 +75,27 @@ padTouchedRemote.OnClientEvent:Connect(function(Pad : Model, purchased : boolean
             end
         end
     end
-    --Play button pressed animation
-    cache[Pad].Pressed:Play()
     --Play button pressed sound
     QuickSound(BUTTON_SOUND, padButton, true)
     --See if purchase was successful
     if purchased then
-        --Clear cache and tweens (pad will be destroyed)
+        --Play button pressed animation without reverse
+        cache[Pad].PurchasePressed:Play()
+        --Tween beams to shoot up and fade out
+        for _, beam : Beam in pairs(cache[Pad].Beams) do
+            --Shoot up
+            QuickTween(beam, purchasePressTF, {Width0 = 50, Width1 = 50})
+            --Fade out
+            TweenAny:TweenSequence(beam, {Transparency = NumberSequence.new(1)}, purchasePressTF)
+        end
+        --Clear cache and tweens after done using (pad will be destroyed)
         cache[Pad].Pressed:Destroy()
         cache[Pad].Failed:Destroy()
-        for _, tween in pairs(cache[Pad].Beams) do
-            tween:Destroy()
-        end
+        table.clear(cache[Pad].Beams)
         cache[Pad] = nil
         --Get pad CFrame for sound, particles, and tween
         local padCFrame = Pad:GetPivot()
-        --Play random purchase sound
+        --Play purchase sound
         QuickSound(PURCHASE_SOUND, padCFrame, true)
         --Emit purchase particles
         coinExplosion:Emit(padCFrame, PURCHASE_EMIT)
@@ -103,14 +111,19 @@ padTouchedRemote.OnClientEvent:Connect(function(Pad : Model, purchased : boolean
             Pad:Destroy()
         end)
     else
-        --Play purchase failed animations
-        cache[Pad].Failed:Play()
-        for _, beam in pairs(cache[Pad].Beams) do
-            --Tween beam color the same as pad color
-            TweenAny:TweenSequence(beam, {Color = ColorSequence.new(buttonFailGoal.Color)}, buttonTF)
+        --Play button pressed animation
+        cache[Pad].Pressed:Play()
+        --Make sure this pad can fail
+        if not constant then
+            --Play purchase failed animations
+            cache[Pad].Failed:Play()
+            for _, beam : Beam in pairs(cache[Pad].Beams) do
+                --Tween beam color the same as pad color
+                TweenAny:TweenSequence(beam, {Color = ColorSequence.new(buttonFailGoal.Color)}, buttonTF)
+            end
+            --Play purchase failed sound
+            QuickSound(PURCHASE_FAIL, padButton, true)
         end
-        --Play purchase failed sound
-        QuickSound(PURCHASE_FAIL, padButton, true)
     end
 end)
 
