@@ -112,7 +112,6 @@ function Tycoon.new(Player : Player)
 
     --Get first available slot
     self.slot = getSlot()
-    print(self.slot, availableSlots)
     --Correctly position tycoon 
     self.tycoonModel:PivotTo(translateCFrame(self.tycoonModel:GetPivot(), self.slot))
     --Name tycoon to UserId and parent
