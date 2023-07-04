@@ -24,8 +24,9 @@ local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local padTouchedRemote = remotes:WaitForChild("PadTouched")
 
 --Settings
-local TYCOON_DISTANCE = 300 --Studs between tycoons
-local MAX_TYCOONS = 4 --Max tycoons per server
+local TYCOON_ANGLE = 45 --Angle between tycoons
+local CIRCLE_RADIUS = 300 --Radius of tycoon "circle"
+local MAX_TYCOONS = 5 --Max tycoons per server
 local PAYOUT_INTERVAL = 2.5 --Seconds between payouts
 local PAD_COOLDOWN = 1 --Cooldown time in seconds between registering pad touched
 
@@ -38,19 +39,26 @@ local availableSlots = {}
 local cachedBuildings = {}
 local tycoonQueue = {}
 local paychecks = {}
+local requiredShip = 0
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
 --Translates cframes based on tycoon slot (stored as a function incase translation ever changes)
 local function translateCFrame(originalCFrame : CFrame, slot : number) : CFrame
-    --Calculate
-    return originalCFrame + Vector3.new(0, 0, TYCOON_DISTANCE * slot)
+    --Increment the angle of each tycoon by TYCOON_ANGLE (starting at 0 degrees)
+    local angleIncrement = (slot - 1) * TYCOON_ANGLE
+    --Cosine(theta) = adjacent/hypotenuse, therefore; adjacent = cosine(theta) * hypotenuse.
+    local zIncrement = math.cos(angleIncrement) * CIRCLE_RADIUS
+    --Sin(theta) = opposite/hypotenuse, therefore; opposite = sin(theta) * hypotenuse
+    local xIncrement = math.sin(angleIncrement) * CIRCLE_RADIUS
+    --Calculate position along "circle" of tycoons, rotate 90 degrees extra to face inwards
+    return originalCFrame * CFrame.Angles(0, math.rad(angleIncrement) + math.rad(90), 0) + Vector3.new(xIncrement, 0, zIncrement)
 end
 
 --Safely gets the next available tycoon spot, yielding if necessary
 local function getSlot()
     --Attempt to get slot
-    local slot = next(availableSlots)
+    local index, slot = next(availableSlots)
     --Determine if yielding is necessary
     if not slot then
         --Create event
@@ -61,6 +69,9 @@ local function getSlot()
         slot = onAvailable.Event:Wait()
         --Clean up
         onAvailable:Destroy()
+    else
+        --Remove slot
+        table.remove(availableSlots, index)
     end
     return slot
 end
@@ -92,17 +103,15 @@ function Tycoon.new(Player : Player)
     self.padStorage = Instance.new("Folder")
     self.padStorage.Name = self.DataObject.Key.."_Storage"
     self.padStorage.Parent = game.ServerStorage
+    --Initialize ship pieces table
+    self.shipPieces = {}
     setmetatable(self, Tycoon)
 
     --// INITIAL SETUP CODE \\--
 
     --Get first available slot
     self.slot = getSlot()
-    --Remove slot because it is no longer available (if not received directly)
-    local slotIndex = table.find(availableSlots, self.slot)
-    if slotIndex then
-        table.remove(availableSlots, slotIndex)
-    end
+    print(self.slot, availableSlots)
     --Correctly position tycoon 
     self.tycoonModel:PivotTo(translateCFrame(self.tycoonModel:GetPivot(), self.slot))
     --Name tycoon to UserId and parent
@@ -138,20 +147,10 @@ function Tycoon.new(Player : Player)
     characterAddedConnection = Player.CharacterAdded:Connect(function(character : Model)
         self:CharacterAdded(character)
     end)
+    --Load first character
+    Player:LoadCharacter()
     --Add to connections for GC
     table.insert(self.connections, characterAddedConnection)
-    --Make sure that the first character is moved and loaded
-    task.spawn(function()
-        --Get character model
-        local character = Player.Character or Player.CharacterAdded:Wait()
-        --Wait until character can be pivoted
-        character:WaitForChild("HumanoidRootPart")
-        --Move to spawn manually
-        character:PivotTo(self.tycoonModel.Essentials.SpawnLocation.CFrame)
-        --Load
-        self:CharacterAdded(character)
-    end)
-    
     return self
 end
 
@@ -251,6 +250,10 @@ function Tycoon:CharacterAdded(character : Model)
             removingConnection:Disconnect()
             descendantAddedConnection:Disconnect()
         end
+    end)
+    --Load new character if player dies
+    character:WaitForChild("Humanoid").Died:Once(function()
+        self.Player:LoadCharacter()
     end)
     --Catch loaded parts
     for _, descendant in pairs(character:GetDescendants()) do
@@ -380,6 +383,11 @@ function Tycoon:Fulfill(purchased : any)
                 self:ActivatePad(Pad, Pad:GetAttribute("Target"))
             end
         end
+        --Check if this is a part of the ship
+        if building:GetAttribute("Ship") then
+            --Update table of ship pieces
+            table.insert(self.shipPieces, building)
+        end
     end
 end
 
@@ -388,6 +396,22 @@ end
 --Set all slots to available
 for i = 1, MAX_TYCOONS do
     table.insert(availableSlots, i)
+end
+
+--Set pivot of all buildings to tycoon base for correct positioning
+for _, building : Model in pairs(tycoonBuildings:GetChildren()) do
+    --Make sure this is a valid building
+    if building:IsA("Model") then
+        --Set pivot
+        building.WorldPivot = tycoonTemplate.WorldPivot
+        --Set descendant count
+        building:SetAttribute("DescendantCount", #building:GetDescendants())
+        --Check if this is a ship part
+        if building:GetAttribute("Ship") then
+            --Update number of required ship pieces
+            requiredShip += 1
+        end
+    end
 end
 
 --Interval paycheck loop

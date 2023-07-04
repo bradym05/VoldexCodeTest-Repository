@@ -36,6 +36,9 @@ Other Notes:<br />
 -Created SetData and GetData remotes for client accessible data. <br />
 -I have added my own sounds from the Toolbox. All sounds are uploaded by Roblox to avoid any copyright issues or future takedowns.<br />
 -Parented interface buttons to a canvas group for hover animation.<br />
+-Downloaded, modified, then imported a Sketchfab model of a floating island: https://sketchfab.com/3d-models/low-poly-little-island-a1342470050b479caf5ed79dda88414d<br />
+-Replaced tycoon baseplate with floating islands.<br />
+-Rotated angle of TycoonBase and Buildings to start with a pivot orientation of (0, 0, 0).<br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.<br />
 
@@ -85,14 +88,16 @@ MainHandler (was TycoonHandler) (PadService replacement): <br />
 
 TycoonClass: <br />
 
--Creates tycoon and moves to the first available slot<br />
--Loads purchased objects<br />
--Loads pads after purchased objects to avoid unnecessary connections and keep dependencies accurate<br />
--Sets collision group of pads to only collide with owner's character (workspace.TouchesUseCollisionGroups must stay enabled)<br />
--Slots are obtained by yielding if necessary (ex. player joins before a tycoon becomes available)<br />
--Pads are only connected to onTouched when purchaseable<br />
--Pads are hidden in ServerStorage until needed or destroyed if not needed<br />
--Connections are cleaned up as quickly as possible or when tycoon is destroyed<br />
+-Creates tycoon and calculates first available slot in a variable radius and variable angle with trigonometry. <br />
+-Sets pivot of all buildings to the tycoon template to ensure accurate positioning. <br />
+-Sets DescendantCount attribute to all buildings for client to recognize when a building has loaded. <br />
+-Loads purchased objects.<br />
+-Loads pads after purchased objects to avoid unnecessary connections and keep dependencies accurate.<br />
+-Sets collision group of pads to only collide with owner's character (workspace.TouchesUseCollisionGroups must stay enabled).<br />
+-Slots are obtained by yielding if necessary (ex. player joins before a tycoon becomes available).<br />
+-Pads are only connected to onTouched when purchaseable.<br />
+-Pads are hidden in ServerStorage until needed or destroyed if not needed.<br />
+-Connections are cleaned up as quickly as possible or when tycoon is destroyed.<br />
 -Pads generate a price label to display price and object to player. <br />
 -Underscores in object names are converted to spaces for display. <br />
 -PaycheckMachine increments player's money and resets money available for collection when touched. <br />

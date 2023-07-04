@@ -1,3 +1,9 @@
+--[[
+    TODO:
+    Refactor variable gui functions to work with all properties instead of just size and position. Search for all attributes with
+    device type and get property name from attribute name, then set guiObject[property name] to attribute value.
+--]]
+
 ------------------// PRIVATE VARIABLES \\------------------
 
 --Services

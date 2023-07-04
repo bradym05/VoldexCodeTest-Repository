@@ -4,6 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
 
 --Modules
 local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
@@ -165,22 +166,41 @@ local function animatePart(part : BasePart)
     end
 end
 
+
 --Function to animate building on purchased
 local function animateBuilding(building : Model)
     --Check if animations are enabled first
     if buildAnimationsSetting.Value == true then
+        --Initialize descendant count and get loaded descendant count
+        local loadedDescendants = building:GetAttribute("DescendantCount")
+        local currentDescendants = 0
         --Animate existing parts
-        for _, part in pairs(building:GetDescendants()) do
-            animatePart(part)
+        for _, descendant in pairs(building:GetDescendants()) do
+            --Animate descendant
+            animatePart(descendant)
+            --Increment descendant count
+            currentDescendants += 1
         end
-        --Animate newly added parts
-        local descendantAddedConnection = building.DescendantAdded:Connect(animatePart)
-        --Disconnect after 5 seconds
-        task.delay(5, function()
-            descendantAddedConnection:Disconnect()
-        end)
+        --Animate newly added parts if building has not fully loaded
+        if currentDescendants ~= loadedDescendants then
+            local descendantAddedConnection
+            descendantAddedConnection = building.DescendantAdded:Connect(function(descendant)
+                --Animate descendant
+                animatePart(descendant)
+                --Increment descendant count
+                currentDescendants += 1
+                --Disconnect if model has loaded
+                if currentDescendants == loadedDescendants then
+                    descendantAddedConnection:Disconnect()
+                    descendantAddedConnection = nil
+                end
+            end)
+        end
     end
 end
 
 --Connect to animate new buildings
 buildings.ChildAdded:Connect(animateBuilding)
+
+-------------------// FLOATING DEBRIS \\-------------------
+

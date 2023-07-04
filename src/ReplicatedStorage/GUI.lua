@@ -16,8 +16,6 @@ local QuickTween = require(ReplicatedStorage:WaitForChild("QuickTween"))
 --Tweens
 local sliderTF = TweenInfo.new(0.1, Enum.EasingStyle.Linear)
 
-------------------// PRIVATE FUNCTIONS \\------------------
-
 --------------------// SLIDER CLASS \\---------------------
 
 local Slider = {}

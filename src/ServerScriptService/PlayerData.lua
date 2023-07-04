@@ -20,7 +20,7 @@ local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 --Current save
 local SaveFile = DataStoreService:GetDataStore("Save_10")
 --Active saving store
-local SaveStore = MemoryStoreService:GetSortedMap("Saving")
+local SaveStore = MemoryStoreService:GetSortedMap("ActiveSaving")
 
 --Settings
 local RETRY_DELAY = 5
@@ -31,7 +31,9 @@ local CACHE_TIME = 5 -- IMPORTANT: VALUE MUST BE >= 4! Cache time in seconds for
 local requestCounts = {} -- {sent, pending}
 local lastRequest = {}
 local playerToData = {}
+local loadedSignals = {}
 local processes = 0
+local serverId = os.time() -- Unique server Id
 
 --Some of the DataStoreRequestType enums refer to multiple requests, translated here
 local translatedRequests = {
@@ -134,6 +136,8 @@ local function retryAny(from : any, functionName : string, retries : number, ...
     end
     --Check if retries have exceeded or met the maximum and stop recursing, or continue
     if retries >= MAX_RETRIES then
+        --Indicate that request finished processing
+        processes -= 1
         return false
     else
         --Store arguments for use in pcall
@@ -226,10 +230,12 @@ function safeManage(requestName : string, ...)
             --Wait until budget resets (additional 5 seconds to be safe)
             task.wait(os.clock() - lastRequest[requestType] + additionalTime + 5)
         end
+        --Get result
+        local result = request(requestName, requestType, ...)
         --Indicate that request finished
         processes -= 1
-        --Return results
-        return request(requestName, requestType, ...)
+        --Return result
+        return result
     end
 end
 
@@ -241,7 +247,19 @@ DataObject.__index = DataObject
 
 --Allow external scripts to manage data without creating it
 function DataObject.getDataObject(Player : Player)
-    return playerToData[Player]
+   --Check if data is loaded and return first
+    if playerToData[Player] then
+        return playerToData[Player]
+    else
+        --Create signal if not created
+        if not loadedSignals[Player] then
+            loadedSignals[Player] = CustomSignal.new()
+        end
+        --Yield result of loaded signal
+        local success = loadedSignals[Player]:Wait()
+        --Return data or false
+        return success and playerToData[Player] or false
+    end
 end
 
 --Creates a new DataObject. Performs checks to ensure that player is not still saving in another server before proceeding.
@@ -263,7 +281,7 @@ function DataObject.new(Player : Player)
     --Check if value was successfully retrieved
     if getSuccess then
         --Check if player's data is saving in another server
-        if getResult == true and Player and Player:IsDescendantOf(Players) then
+        if getResult and getResult ~= serverId and Player and Player:IsDescendantOf(Players) then
             --Clean up without saving
             self:Destroy(true)
             --Kick player
@@ -276,7 +294,7 @@ function DataObject.new(Player : Player)
         return false
     end
     --Set value of UserId key to true in SaveStore with an expiration time of one week (604800 seconds)
-    retryAny(SaveStore, "SetAsync", 0, self.Key, true, 604800) 
+    retryAny(SaveStore, "SetAsync", 0, self.Key, serverId, 604800) 
     --Indicate that player is now in memory
     self.inMemory = true
     --Get initial data
@@ -447,10 +465,17 @@ for i = 301,306 do codeChecks[tostring(i)] = requestDropped end
 
 --Clean up on leave
 Players.PlayerRemoving:Connect(function(Player : Player)
+    --Destroy data object and remove reference
     if playerToData[Player] then
         playerToData[Player]:Destroy()
         playerToData[Player] = nil
     end
+    --Clean up loaded signal if active
+    if loadedSignals[Player] then
+        loadedSignals[Player]:FireOnce(false)
+    end
+    --Remove reference
+    loadedSignals[Player] = nil
 end)
 
 --Save on close
@@ -465,6 +490,8 @@ game:BindToClose(function()
         -- PlayerDataObject is needed as a parameter when indexing function
         task.spawn(PlayerDataObject.Update, PlayerDataObject)
     end
+    --Wait 2 seconds to allow processes count to increment
+    task.wait(2)
     --Wait for all active processes to finish before server closes
     repeat task.wait() until processes <= 0
 end)

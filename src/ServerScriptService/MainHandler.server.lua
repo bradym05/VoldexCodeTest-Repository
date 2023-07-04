@@ -105,23 +105,6 @@ local function playerRemoving(Player : Player)
     end
 end
 
---Yield until given player has loaded or left
-local function getLoadedData(Player : Player)
-    --Check if data is loaded and return first
-    if playerToData[Player] then
-        return playerToData[Player]
-    else
-        --Create signal if not created
-        if not loadedSignals[Player] then
-            loadedSignals[Player] = CustomSignal.new()
-        end
-        --Yield result of loaded signal
-        local success = loadedSignals[Player]:Wait()
-        --Return data or false
-        return success and playerToData[Player] or false
-    end
-end
-
 ---------------------// PRIVATE CODE \\--------------------
 
 --Catch players who may have already loaded
@@ -134,7 +117,7 @@ Remotes:WaitForChild("GetData").OnServerInvoke = function(Player : Player, dataN
     --Verify this is data accessible by the client
     if dataName and table.find(CLIENT_ACCESS, dataName) then
         --Get data
-        local data = getLoadedData(Player)
+        local data = PlayerData.getDataObject(Player)
         --Verify data exists
         if data then
             --Return value
@@ -148,7 +131,7 @@ Remotes:WaitForChild("SetData").OnServerEvent:Connect(function(Player : Player, 
     --Verify this is data accessible by the client
     if dataName and table.find(CLIENT_ACCESS, dataName) then
         --Get data
-        local data = getLoadedData(Player)
+        local data = PlayerData.getDataObject(Player)
         --Verify data exists
         if data then
             --Set data
