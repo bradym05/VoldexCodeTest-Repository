@@ -8,13 +8,117 @@ This module stores reusable classes for GUI components.
 --Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 --Modules
 local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 local QuickTween = require(ReplicatedStorage:WaitForChild("QuickTween"))
+local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
+
+--Instances
+local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
+
+--Settings
+local BUTTON_CLICK_IN : Sound = sounds:WaitForChild("SingleClick") --Sound played when a button is pressed
+local BUTTON_CLICK_OUT : Sound = sounds:WaitForChild("ClickOut") --Sound played when button press ends
 
 --Tweens
 local sliderTF = TweenInfo.new(0.1, Enum.EasingStyle.Linear)
+local buttonTF = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+
+------------------// PRIVATE FUNCTIONS \\------------------
+
+--Return true if input can be used to press a gui object
+local function inputIsPress(inputObject : InputObject)
+    return inputObject.UserInputType == Enum.UserInputType.MouseButton1 or inputObject.UserInputType == Enum.UserInputType.Touch
+end
+
+--------------------// BUTTON CLASS \\---------------------
+
+local Button = {}
+Button.__index = Button
+
+--Create new button object
+function Button.new(base : GuiButton, callback : any?)
+    --Initialize variables
+    local sizeIn = UDim2.new(base.Size.X.Scale * 0.95, 0, base.Size.Y.Scale * 0.95, 0) --Scale to 95% of original size when pressed
+    local sizeOut = base.Size
+    --Create object
+    local self = {}
+    --Initialize variables
+    self.base = base
+    self.callback = callback
+    --Tweens
+    self.tweenIn = TweenService:Create(base, buttonTF, {Size = sizeIn})
+    self.tweenOut = TweenService:Create(base, buttonTF, {Size = sizeOut})
+    --Connections table for GC
+    self.connections = {}
+    setmetatable(self, Button)
+    --Connect to button press started
+    local inputBegan
+    inputBegan = base.InputBegan:Connect(function(input)
+        self:PressIn(input)
+    end)
+    --Connect to button press ended
+    local inputEnded
+    inputEnded = base.InputEnded:Connect(function(input)
+        self:PressOut(input)
+    end)
+    --Add connections to table for GC
+    table.insert(self.connections, inputBegan)
+    table.insert(self.connections, inputEnded)
+
+    return self
+end
+
+--Clean up
+function Button:Destroy()
+    --Disconnect connections
+    for _, connection : RBXScriptConnection in pairs(self.connections) do
+        --Check if connection is connected
+        if connection and connection.Connected then
+            connection:Disconnect()
+        end
+    end
+    --Destroy tweens
+    self.tweenIn:Destroy()
+    self.tweenOut:Destroy()
+    --Clear self
+    table.clear(self)
+    setmetatable(self, nil)
+    table.freeze(self)
+end
+
+--Click button in
+function Button:PressIn(input : InputObject)
+    --Determine if input is valid
+    if inputIsPress(input) then
+        --Set press input
+        self.pressInput = input
+        --Play click sound
+        QuickSound(BUTTON_CLICK_IN)
+        --Play tween in
+        self.tweenIn:Play()
+    end
+end
+
+--Click button out
+function Button:PressOut(input : InputObject)
+    --Check if button is pressed and released input is pressed input
+    if self.pressInput and self.pressInput == input then
+        --Clear press input
+        self.pressInput = nil
+        --Play click sound
+        QuickSound(BUTTON_CLICK_OUT)
+        --Play tween out
+        self.tweenOut:Play()
+        --Check for callback
+        if self.callback then
+            --Run callback
+            self.callback()
+        end
+    end
+end
 
 --------------------// SLIDER CLASS \\---------------------
 
@@ -42,7 +146,7 @@ function Slider.new(base : ImageButton, progressBar : Frame)
     local inputBegan
     inputBegan = base.InputBegan:Connect(function(input : InputObject)
         --Determine if input is valid
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if inputIsPress(input) then
             --Update holding input
             self.holdInput = input
             --Update progress
@@ -122,5 +226,6 @@ end
 local GUI = {}
 --Return functions to create all classes
 GUI.Slider = Slider.new
+GUI.Button = Button.new
 
 return GUI

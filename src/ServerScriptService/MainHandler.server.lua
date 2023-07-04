@@ -13,18 +13,35 @@ local ServerScriptService = game:GetService("ServerScriptService")
 --Modules
 local PlayerData = require(ServerScriptService:WaitForChild("PlayerData"))
 local TycoonClass = require(ServerScriptService:WaitForChild("TycoonClass"))
-local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 
 --Instances
 local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
 local getData : RemoteFunction = remotes:WaitForChild("GetData")
 local setData : RemoteEvent = remotes:WaitForChild("SetData")
+local upgradeEvent : RemoteEvent = remotes:WaitForChild("RequestUpgrade")
+
+--Settings
+local BASE_UPGRADE_PRICE = 500 --Price for each paycheck upgrade (increasing)
+local BASE_PAYCHECK = 50 --Increment for paycheck upgrades
+
+local REPLICATED_STATS = { --Put the names and value ClassNames of data to be included in leaderstats here
+    Money = "IntValue",
+}
+local REPLICATED_HIDDEN = { --Put the names and value ClassNames of data to be replicated but hidden here
+    Paycheck = "IntValue",
+    UpgradeCost = "IntValue",
+}
+local CLIENT_ACCESS = { --Data which can be read and changed by players
+    "Settings"
+}
+
 
 --DataStore template
 PlayerData.TEMPLATE = {
     Money = 1000,
     Purchased = {},
-    Paycheck = 50,
+    Paycheck = BASE_PAYCHECK,
+    UpgradeCost = BASE_UPGRADE_PRICE,
     MoneyToCollect = 0,
     Settings = {
         GameVolume = 0.75,
@@ -35,19 +52,9 @@ PlayerData.TEMPLATE = {
     }
 }
 
---Settings
-local REPLICATED_STATS = { --Put the names and value ClassNames of data to be included in leaderstats here
-    Money = "IntValue",
-}
-local REPLICATED_HIDDEN = { --Put the names and value ClassNames of data to be replicated but hidden here
-    Paycheck = "IntValue",
-}
-local CLIENT_ACCESS = { --Data which can be read and changed by players
-    "Settings"
-}
-
 --Manipulated
 local playerToTycoon = {}
+local upgradeDebounce = {}
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
@@ -95,6 +102,7 @@ local function playerRemoving(Player : Player)
         playerToTycoon[Player]:Destroy()
         --Remove references
         playerToTycoon[Player] = nil
+        upgradeDebounce[Player] = nil
     end
 end
 
@@ -136,6 +144,34 @@ local function setDataFunction(Player : Player, dataName : string, value : any)
     end
 end
 
+--Upgrade paycheck remote event
+local function upgradePaycheckFunction(Player : Player)
+    --Make sure another purchase is not processing
+    if not upgradeDebounce[Player] then
+        --Disable other upgrade requests
+        upgradeDebounce[Player] = true
+        --Get data
+        local data = PlayerData.getDataObject(Player)
+        --Verify data exists
+        if data then
+            --Get balance and price
+            local money = data:GetData("Money")
+            local price = data:GetData("UpgradeCost")
+            --Check sufficient funds
+            if money >= price then
+                --Deduct price from player's balance
+                data:IncrementData("Money", -price)
+                --Increment next upgrade cost
+                data:IncrementData("UpgradeCost", BASE_UPGRADE_PRICE)
+                --Increment paycheck
+                data:IncrementData("Paycheck", BASE_PAYCHECK)
+            end
+        end
+        --Enable other upgrade requests
+        upgradeDebounce[Player] = false
+    end
+end
+
 ---------------------// PRIVATE CODE \\--------------------
 
 --Combine REPLICATED_STATS and REPLICATED_HIDDEN
@@ -155,3 +191,4 @@ getData.OnServerInvoke = getDataFunction
 Players.PlayerAdded:Connect(playerAdded)
 Players.PlayerRemoving:Connect(playerRemoving)
 setData.OnServerEvent:Connect(setDataFunction)
+upgradeEvent.OnServerEvent:Connect(upgradePaycheckFunction)

@@ -9,17 +9,25 @@ local TweenService = game:GetService("TweenService")
 local TweenAny = require(ReplicatedStorage:WaitForChild("TweenAny"))
 local QuickTween = require(ReplicatedStorage:WaitForChild("QuickTween"))
 local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
+local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
+local GUI = require(ReplicatedStorage:WaitForChild("GUI"))
 
 --Instances
 local player : Player = Players.LocalPlayer
+local leaderstats : Folder = player:WaitForChild("leaderstats")
+local moneyStat : IntValue = leaderstats:WaitForChild("Money")
+
 local hiddenstats : Folder = player:WaitForChild("hiddenstats")
 local paycheckStat : IntValue = hiddenstats:WaitForChild("Paycheck")
+local priceStat : IntValue = hiddenstats:WaitForChild("UpgradeCost")
 
 local playerGui : PlayerGui = player:WaitForChild("PlayerGui")
 local mainInterface : Frame = playerGui:WaitForChild("MainInterface")
 local popup : Frame = mainInterface:WaitForChild("Popup")
 local paycheckFrame : Frame = popup:WaitForChild("Container"):WaitForChild("Paycheck")
 local paycheckValueLabel : TextLabel = paycheckFrame:WaitForChild("PaycheckValue")
+local priceLabel : TextLabel = paycheckFrame:WaitForChild("UpgradePrice")
+local upgradeButton : ImageButton = paycheckFrame:WaitForChild("UpgradeButton")
 local shineGradient : UIGradient = paycheckValueLabel:WaitForChild("UIGradient")
 local viewport : ViewportFrame = paycheckFrame:WaitForChild("PaycheckViewport")
 
@@ -30,12 +38,17 @@ local coinPile : MeshPart = assets:WaitForChild("CoinPile"):Clone()
 local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
 local coinSounds : table = sounds:WaitForChild("Coins"):GetChildren()
 
+local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
+local requestUpgrade : RemoteEvent = remotes:WaitForChild("RequestUpgrade")
+
 --Settings
 local CAMERA_ANGLE = 20 --Camera angle (in degrees) specifying the amount to look down by
 local CAMERA_DISTANCE = 10 --Camera distance from coin pile
 local FOV = 15 --Base camera field of view
 local PAYCHECK_PER_COIN = 10 --Minimum paycheck increment for one coin
 local ANIM_TIME = 1.5 --Time for pile to scale in seconds and camera to adjust (coins fall in half this time)
+local PURCHASE_FAIL = sounds:WaitForChild("Error") -- Sound played upon failed purchase
+local PURCHASE_SOUND = sounds:WaitForChild("Purchase") -- Sound played on purchase
 
 --Tween Settings
 local shineTF = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
@@ -47,7 +60,9 @@ local cameraTF = TweenInfo.new(ANIM_TIME, Enum.EasingStyle.Quad, Enum.EasingDire
 local shineLooping = false
 local viewportCamera = Instance.new("Camera")
 local lastPaycheck = paycheckStat.Value
+local lastPrice = priceStat.Value
 local paycheckLerpSignal = CustomSignal.new()
+local priceLerpSignal = CustomSignal.new()
 local minPos : Vector3
 local maxPos : Vector3
 local pileScale : number
@@ -122,6 +137,12 @@ local function setDisplayText(currentPaycheck : number)
     paycheckValueLabel.Text = "$ "..tostring(math.round(currentPaycheck)).." / second"
 end
 
+--Set price text
+local function setPriceText(currentPrice : number)
+    --Add info to price value and round
+    priceLabel.Text = "PRICE: $ "..tostring(math.round(currentPrice))
+end
+
 --Handle changes in paycheck value
 local function paycheckChanged()
     --Check if a change has occured
@@ -152,6 +173,55 @@ local function paycheckChanged()
     lastPaycheck = paycheckStat.Value
 end
 
+--Handle changes in price value
+local function priceChanged()
+    --Check if a change has occured
+    if priceStat.Value ~= lastPrice then
+        --Play purchase success sound
+        QuickSound(PURCHASE_SOUND)
+        --Check if value should be animated
+        if paycheckFrame.Visible == true then
+            TweenAny:TweenNumber(lastPrice, priceStat.Value, ANIM_TIME, priceLerpSignal)
+        else
+            setPriceText(priceStat.Value)
+        end
+        --Set last price
+        lastPrice = priceStat.Value
+    end
+end
+
+--Loop shine tween
+local function loopShine()
+    --Make sure loop is not in progress
+    if not shineLooping then
+        --Indicate that tween is looping
+        shineLooping = true
+        --Reset gradient
+        shineGradient.Offset = Vector2.new(-1, 0)
+        --Wait a random amount of time before looping
+        task.wait(math.random(5, 10))
+        --Make sure frame is open first
+        if paycheckFrame.Visible == true then
+            --Loop
+            shineTween:Play()
+         end
+        --Indicate that tween is not looping
+        shineLooping = false
+    end
+end
+
+--Request upgrade
+local function requestUpgradeFunction()
+    --Check sufficient funds
+    if moneyStat.Value >= priceStat.Value then
+        --Request upgrade
+        requestUpgrade:FireServer()
+    else
+        --Play purchase failed sound
+        QuickSound(PURCHASE_FAIL)
+    end
+end
+
 --Pause animations when frame is hidden
 local function onVisibleChanged()
     --Look for change
@@ -178,28 +248,19 @@ setCamera(false)
 
 --Set initial text
 setDisplayText(paycheckStat.Value)
+setPriceText(priceStat.Value)
 
 --Connect to shine animation ended for seamless loop
-shineTween.Completed:Connect(function()
-    --Make sure loop is not in progress
-    if not shineLooping then
-        --Indicate that tween is looping
-        shineLooping = true
-        --Reset gradient
-        shineGradient.Offset = Vector2.new(-1, 0)
-        --Wait a random amount of time before looping
-        task.wait(math.random(5, 10))
-        --Make sure frame is open first
-        if paycheckFrame.Visible == true then
-            --Loop
-            shineTween:Play()
-        end
-        --Indicate that tween is not looping
-        shineLooping = false
-    end
-end)
+shineTween.Completed:Connect(loopShine)
 
---Connections
+--Connect to upgrade cost changed for animation
+priceStat.Changed:Connect(priceChanged)
+
+--Connect to button pressed to request upgrade
+GUI.Button(upgradeButton, requestUpgradeFunction)
+
+--Other Connections
 paycheckFrame:GetPropertyChangedSignal("Visible"):Connect(onVisibleChanged)
 paycheckStat.Changed:Connect(paycheckChanged)
 paycheckLerpSignal:Connect(setDisplayText)
+priceLerpSignal:Connect(setPriceText)

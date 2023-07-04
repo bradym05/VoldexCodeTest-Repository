@@ -214,6 +214,10 @@ GUI module:<br />
 -Gets changes in mouse location when held down.<br />
 -Fires signal when value updates.<br />
 
+-Button Class:<br />
+-Registers a callback if provided to button press completed.<br />
+-Plays click in animation and sound, click out animation and sound.<br />
+
 InputDetection:<br />
 
 -Detects changes in UserInputType.<br />
@@ -227,6 +231,7 @@ Music:<br />
 -Plays each song until it ends and plays the next song.<br />
 -Once playlist is finished, reshuffles.<br />
 -Pauses music if volume is muted.<br />
+-Waits until settings have loaded and all songs have loaded before playing music.<br />
 
 PaycheckHandler:<br />
 
@@ -234,3 +239,10 @@ PaycheckHandler:<br />
 -Creates a pile of coins relative to the size of player's paycheck.<br />
 -Animates coins falling and increases pile size based on changes in paycheck.<br />
 -Does not animate unless frame is open.<br />
+-Creates a button object from the GUI module to request upgrades.<br />
+-Animates price of upgrade on change.<br />
+-Indicates purchase success or failure to the player.<br />
+
+Misc:<br />
+
+-Sets song count attribute of Music folder to total number of songs<br />
