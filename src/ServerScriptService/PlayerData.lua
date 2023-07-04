@@ -18,7 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 
 --Current save
-local SaveFile = DataStoreService:GetDataStore("Save_10")
+local SaveFile = DataStoreService:GetDataStore("Save_11")
 --Active saving store
 local SaveStore = MemoryStoreService:GetSortedMap("ActiveSaving")
 

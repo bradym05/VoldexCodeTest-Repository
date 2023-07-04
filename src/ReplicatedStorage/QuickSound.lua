@@ -49,16 +49,6 @@ local function QuickSound(base : Sound | string, parentOrCFrame : (Instance | CF
     end
     --Make sure provided base is a valid sound
     if base and typeof(base) == "Instance" and base:IsA("Sound") then
-        --Initialize variables
-        local sound = base:Clone()
-        local destroyAfter = sound
-        --Set defaults if requested
-        if defaults then
-            for propertyName : string, propertyValue : any in pairs(SOUND_DEFAULTS) do
-                --Set sound property to default sound property
-                sound[propertyName] = propertyValue
-            end
-        end
         --Get SoundGroup instance if group is a string (SoundGroup will be nil if not found and therefore set automatically)
         if group and type(group) == "string" then
             group = SoundService:FindFirstChild(group)
@@ -82,32 +72,45 @@ local function QuickSound(base : Sound | string, parentOrCFrame : (Instance | CF
             --Get cache
             group = groupCache[group]
         end
-        --Set SoundGroup
-        sound.SoundGroup = group
-        --Parent sound accordingly
-        if typeof(parentOrCFrame) == "CFrame" then
-            --Create an attachment if a CFrame was provided
-            local attachment = Instance.new("Attachment")
-            attachment.WorldCFrame = parentOrCFrame
-            attachment.Parent = soundPart
-            --Set parent to attachment
-            parentOrCFrame = attachment
-            --Set attachment to be destroyed instead of sound
-            destroyAfter = attachment
-        elseif not parentOrCFrame then
-            --Default to SoundService
-            parentOrCFrame = SoundService
+        --Check volume of group before proceeding
+        if group.Volume > 0 then
+            --Initialize variables
+            local sound = base:Clone()
+            local destroyAfter = sound
+            --Set defaults if requested
+            if defaults then
+                for propertyName : string, propertyValue : any in pairs(SOUND_DEFAULTS) do
+                    --Set sound property to default sound property
+                    sound[propertyName] = propertyValue
+                end
+            end
+            --Set SoundGroup
+            sound.SoundGroup = group
+            --Parent sound accordingly
+            if typeof(parentOrCFrame) == "CFrame" then
+                --Create an attachment if a CFrame was provided
+                local attachment = Instance.new("Attachment")
+                attachment.WorldCFrame = parentOrCFrame
+                attachment.Parent = soundPart
+                --Set parent to attachment
+                parentOrCFrame = attachment
+                --Set attachment to be destroyed instead of sound
+                destroyAfter = attachment
+            elseif not parentOrCFrame then
+                --Default to SoundService
+                parentOrCFrame = SoundService
+            end
+            --Sound can now be parented to parentOrCFrame
+            sound.Parent = parentOrCFrame
+            --Connect to sound ended for clean up
+            sound.Ended:Once(function()
+                destroyAfter:Destroy()
+            end)
+            --Play
+            sound:Play()
+            --Return ended signal incase needed
+            return sound.Ended
         end
-        --Sound can now be parented to parentOrCFrame
-        sound.Parent = parentOrCFrame
-        --Connect to sound ended for clean up
-        sound.Ended:Once(function()
-            destroyAfter:Destroy()
-        end)
-        --Play
-        sound:Play()
-        --Return ended signal incase needed
-        return sound.Ended
     end
 end
 

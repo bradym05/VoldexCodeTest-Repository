@@ -39,6 +39,7 @@ Other Notes:<br />
 -Downloaded, modified, then imported a Sketchfab model of a floating island: https://sketchfab.com/3d-models/low-poly-little-island-a1342470050b479caf5ed79dda88414d<br />
 -Replaced tycoon baseplate with floating islands.<br />
 -Rotated angle of TycoonBase and Buildings to start with a pivot orientation of (0, 0, 0).<br />
+-Added attribute "Ship" to all components of the pirate ship.<br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.<br />
 
@@ -155,6 +156,7 @@ QuickSound:<br />
 -If no parent or CFrame is provided, sounds will be played from SoundService. <br />
 -If no SoundGroup is provided, one will be assigned automatically based on where the sound is parented. <br />
 -Applies default properties, if requested, for consistency. <br />
+-Only creates and plays sound if group volume is greater than 0. <br />
 
 TweenAny:<br />
 
@@ -212,3 +214,10 @@ InputDetection:<br />
 -Determines device by finding patterns which indicate the device of a given UserInputType.<br />
 -Fires a signal when device type changes.<br />
 -Stores current device.<br />
+
+Music:<br />
+
+-Creates a shuffled playlist from ReplicatedStorage.Sounds.Music <br />
+-Plays each song until it ends and plays the next song.<br />
+-Once playlist is finished, reshuffles.<br />
+-Pauses music if volume is muted.<br />

@@ -25,8 +25,9 @@ PlayerData.TEMPLATE = {
     Paycheck = 100,
     MoneyToCollect = 0,
     Settings = {
-        GameVolume = 1,
-        GuiVolume = 1,
+        GameVolume = 0.75,
+        GuiVolume = 0.75,
+        MusicVolume = 0.5,
         Particles = 1,
         BuildAnimations = true,
     }

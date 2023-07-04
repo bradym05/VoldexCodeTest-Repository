@@ -71,25 +71,35 @@ function Signal:Connect(callback : any)
     local connection = Connection.new(callback, self)
     --Add to connections
     table.insert(self._connections, connection)
-    --return connection
+    --Return connection
     return connection
 end
 
 --Connect and disconnect after fired
 function Signal:Once(callback : any)
-    --Get connection
-    local connection = self:Connect(callback)
+    --Initialize variables
+    local connection
+    --Connect to custom function
+    connection = self:Connect(function(...)
+        --Disconnect immediately
+        connection:Disconnect()
+        --Call callback
+        callback(...)
+    end)
+    --Return connection
+    return connection
 end
 
 --Connect via Once() and yield until fired
 function Signal:Wait(maxTime : number)
-    --Connect a function to grab returned values
+    --Initialize variables
+    local elapsed = 0
     local returnedTable
+    --Connect a function to grab returned values
     self:Once(function(...)
         returnedTable = packArgs(...)
     end)
-    local elapsed = 0
-    --Yield until fired
+    --Yield until fired, disconnected, or max wait time has been reached
     repeat
         --Increment elapsed by change in time
         elapsed += task.wait()
