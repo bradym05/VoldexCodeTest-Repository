@@ -4,7 +4,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local CollectionService = game:GetService("CollectionService")
 
 --Modules
 local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
@@ -13,22 +12,22 @@ local TweenAny = require(ReplicatedStorage:WaitForChild("TweenAny"))
 local ParticleHandler = require(ReplicatedStorage:WaitForChild("ParticleHandler"))
 
 --Instances
-local player = Players.LocalPlayer
-local tycoons = workspace:WaitForChild("Tycoons")
-local playerTycoon = tycoons:WaitForChild(tostring(player.UserId))
-local buildings = playerTycoon:WaitForChild("Purchased")
+local player : Player = Players.LocalPlayer
+local tycoons : Folder = workspace:WaitForChild("Tycoons")
+local playerTycoon : Model = tycoons:WaitForChild(tostring(player.UserId))
+local buildings : Folder = playerTycoon:WaitForChild("Purchased")
 
-local particles = ReplicatedStorage:WaitForChild("Particles")
-local sounds = ReplicatedStorage:WaitForChild("Sounds")
+local particles : Folder = ReplicatedStorage:WaitForChild("Particles")
+local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
 
-local remotes = ReplicatedStorage:WaitForChild("Remotes")
-local padTouchedRemote = remotes:WaitForChild("PadTouched")
+local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
+local padTouchedRemote : RemoteEvent = remotes:WaitForChild("PadTouched")
 
-local buildSounds = sounds:WaitForChild("BuildSounds"):GetChildren()
-local swishSounds = sounds:WaitForChild("SwishSounds"):GetChildren()
+local buildSounds : table = sounds:WaitForChild("BuildSounds"):GetChildren()
+local swishSounds : table = sounds:WaitForChild("SwishSounds"):GetChildren()
 
-local settingsFolder = player:WaitForChild("Settings")
-local buildAnimationsSetting = settingsFolder:WaitForChild("BuildAnimations")
+local settingsFolder : Folder = player:WaitForChild("Settings")
+local buildAnimationsSetting : BoolValue = settingsFolder:WaitForChild("BuildAnimations")
 
 --Settings
 local BUTTON_SOUND = sounds:WaitForChild("ButtonPress") -- Sound played upon stepping on a pad

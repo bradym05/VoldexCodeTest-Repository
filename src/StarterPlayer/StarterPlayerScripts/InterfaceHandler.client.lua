@@ -16,27 +16,28 @@ local TweenService = game:GetService("TweenService")
 local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
 local TweenAny = require(ReplicatedStorage:WaitForChild("TweenAny"))
 local InputDetection = require(ReplicatedStorage:WaitForChild("InputDetection"))
+local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 
 --Instances
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local player : Player = Players.LocalPlayer
+local playerGui : PlayerGui = player:WaitForChild("PlayerGui")
 
-local interface = playerGui:WaitForChild("MainInterface")
-local interfaceMenu = interface:WaitForChild("Menu")
-local interfaceContainer = interfaceMenu:WaitForChild("Container")
-local moneyLabel = interfaceMenu:WaitForChild("MoneyCount")
-local moneyIncLabel = interfaceMenu:WaitForChild("MoneyIncrement")
+local interface : Frame = playerGui:WaitForChild("MainInterface")
+local interfaceMenu : Frame = interface:WaitForChild("Menu")
+local interfaceContainer : Frame = interfaceMenu:WaitForChild("Container")
+local moneyLabel : TextLabel = interfaceMenu:WaitForChild("MoneyCount")
+local moneyIncLabel : TextLabel = interfaceMenu:WaitForChild("MoneyIncrement")
 
-local popup = interface:WaitForChild("Popup")
-local popupContainer = popup:WaitForChild("Container")
+local popup : Frame = interface:WaitForChild("Popup")
+local popupContainer : Frame = popup:WaitForChild("Container")
 
-local leaderstats = player:WaitForChild("leaderstats")
-local moneyStat = leaderstats:WaitForChild("Money")
+local leaderstats : Folder = player:WaitForChild("leaderstats")
+local moneyStat : IntValue = leaderstats:WaitForChild("Money")
 
-local sounds = ReplicatedStorage:WaitForChild("Sounds")
-local clickSound = sounds:WaitForChild("SingleClick")
-local swishSoundIn = sounds:WaitForChild("SwishIn")
-local swishSoundOut = sounds:WaitForChild("SwishOut")
+local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
+local clickSound : Sound = sounds:WaitForChild("SingleClick")
+local swishSoundIn : Sound = sounds:WaitForChild("SwishIn")
+local swishSoundOut : Sound = sounds:WaitForChild("SwishOut")
 
 --Settings
 local MONEY_ANIM_TIME = 0.5 --Time it takes to animate money
@@ -61,7 +62,6 @@ local shineGoal = {Offset = Vector2.new(1, 0)}
 local brightnessGoal = {Color = ColorSequence.new(Color3.new(1,1,1))}
 
 --Manipulated
-local displayMoney = 0
 local lastValue = moneyStat.Value
 local closeTweens = {}
 local nameToBrightness = {}
@@ -69,23 +69,15 @@ local guiDefaults = {}
 local variableGui = {}
 local constraints = {}
 local popupOpen = false
+local moneySignal = CustomSignal.new()
 local popupFrame
 local connection : RBXScriptConnection
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
---Money calculation for each frame
-local function updateMoney(start : number, goal : number, elapsed : number) : boolean?
-    --Convert anim speed to time and get an alpha of elapsed/time (progress) and keep between 0 and 1
-    local alpha = math.clamp(elapsed/(MONEY_ANIM_TIME), 0, 1)
-    --Lerp display value with calculated alpha (start value plus difference to goal = goal so difference to goal times alpha = progress)
-    displayMoney = math.round(start + (goal - start)*alpha)
-    --Set display
-    moneyLabel.Text = "$ "..tostring(displayMoney)
-    --Return true if value has completed animation
-    if alpha == 1 then
-        return true
-    end
+--Set money display
+local function updateMoney(lerped : number)
+    moneyLabel.Text = "$ "..tostring(math.round(lerped))
 end
 
 --Play a table of tweens
@@ -102,9 +94,11 @@ local function togglePopup(frame : Frame, open : boolean?)
         --Switch frames
         popupFrame.Visible = false
         frame.Visible = true
+        --Play other closing tweens
+        tweenTable(closeTweens)
         --Set brightness
         nameToBrightness[popupFrame.Name](false)
-        nameToBrightness[frame](true)
+        nameToBrightness[frame.Name](true)
         --Set open
         popupFrame = frame
     elseif (frame == popupFrame or open == false) and popupOpen then --Close if frame is toggled twice or open is false and popup is open
@@ -182,15 +176,15 @@ local function buttonSetup(buttonHolder : Frame)
     imageButton.Activated:Connect(function()
         --Play click
         QuickSound(clickSound)
-        --Make sure this is to open the frame
-        if popupFrame ~= designatedPopup or not popupOpen then
-            --Tween in
-            tweenTable(tweenIns)
-            --Set closed tweens
-            closeTweens = tweenOuts
-        end
         --Toggle popup
         togglePopup(designatedPopup)
+        --Make sure the frame opened
+        if popupFrame == designatedPopup and popupOpen then
+            --Tween in
+            tweenTable(tweenIns)
+            --Set close tweens
+            closeTweens = tweenOuts
+        end
     end)
     --Connect hover event
     imageButton.MouseEnter:Connect(function()
@@ -252,8 +246,11 @@ for propertyName : string, propertyValue in pairs(moneyOutGoal) do
     moneyIncLabel[propertyName] = propertyValue
 end
 
+--Connect to money animation change
+moneySignal:Connect(updateMoney)
+
 --Set moneyLabel text to initial value, without animation (elapsed = time so elapsed/time = 1, no animation)
-updateMoney(displayMoney, moneyStat.Value, MONEY_ANIM_TIME) 
+updateMoney(moneyStat.Value) 
 
 --Connect to changed
 moneyStat.Changed:Connect(function()
@@ -262,12 +259,8 @@ moneyStat.Changed:Connect(function()
         connection:Disconnect()
     end
     --Initialize variables
-    local elapsed = 0
     local goal = moneyStat.Value
-    local start = displayMoney
     local difference = goal - lastValue
-    --Update last value
-    lastValue = goal
     --Set increment label appearance
     if difference < 0 then
         --Lost money
@@ -281,17 +274,10 @@ moneyStat.Changed:Connect(function()
     moneyIncLabel.Text ..= tostring(math.abs(difference))
     --Play increment tween
     moneyIncTweenIn:Play()
-    --Connect to new animation
-    connection = RunService.RenderStepped:Connect(function(deltaTime)
-        --Increment elapsed by change in time
-        elapsed += deltaTime
-        --Update GUI
-        local disconnect = updateMoney(start, goal, elapsed)
-        --Disconnect if animation completed
-        if disconnect then
-            connection:Disconnect()
-        end
-    end)
+    --Tween money value
+    TweenAny:TweenNumber(lastValue, goal, MONEY_ANIM_TIME, moneySignal)
+    --Update last value
+    lastValue = goal
 end)
 
 --Automatically tween out money increment after tweened in

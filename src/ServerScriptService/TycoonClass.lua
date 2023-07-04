@@ -14,20 +14,21 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --Modules
 local PlayerData = require(ServerScriptService:WaitForChild("PlayerData"))
+local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 
 --Instances
-local tycoonsFolder = workspace:WaitForChild("Tycoons")
-local tycoonBuildings = ServerStorage:WaitForChild("Buildings")
-local tycoonTemplate = ServerStorage:WaitForChild("TycoonBase")
-local priceLabelTemplate = ServerStorage:WaitForChild("PriceLabel")
-local remotes = ReplicatedStorage:WaitForChild("Remotes")
-local padTouchedRemote = remotes:WaitForChild("PadTouched")
+local tycoonsFolder : Folder = workspace:WaitForChild("Tycoons")
+local tycoonBuildings : Folder = ServerStorage:WaitForChild("Buildings")
+local tycoonTemplate : Model = ServerStorage:WaitForChild("TycoonBase")
+local priceLabelTemplate : BillboardGui = ServerStorage:WaitForChild("PriceLabel")
+local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
+local padTouchedRemote : RemoteEvent = remotes:WaitForChild("PadTouched")
 
 --Settings
-local TYCOON_ANGLE = 45 --Angle between tycoons
+local TYCOON_ANGLE = 45 --Angle between tycoons (in degrees)
 local CIRCLE_RADIUS = 300 --Radius of tycoon "circle"
 local MAX_TYCOONS = 5 --Max tycoons per server
-local PAYOUT_INTERVAL = 2.5 --Seconds between payouts
+local PAYOUT_INTERVAL = 1 --Seconds between payouts
 local PAD_COOLDOWN = 1 --Cooldown time in seconds between registering pad touched
 
 --Collision group name suffixes (prefix is UserId)
@@ -62,11 +63,11 @@ local function getSlot()
     --Determine if yielding is necessary
     if not slot then
         --Create event
-        local onAvailable = Instance.new("BindableEvent")
+        local onAvailable = CustomSignal.new()
         --Add to queue
         table.insert(tycoonQueue, onAvailable)
         --Wait for availability
-        slot = onAvailable.Event:Wait()
+        slot = onAvailable:Wait()
         --Clean up
         onAvailable:Destroy()
     else
@@ -164,7 +165,7 @@ function Tycoon:Destroy()
     --Indicate slot availability
     if #tycoonQueue > 0 then
         --Notify
-        tycoonQueue[1]:Fire(self.slot)
+        tycoonQueue[1]:FireOnce(self.slot)
         --Remove from queue
         table.remove(tycoonQueue, 1)
     else
@@ -187,6 +188,8 @@ function Tycoon:Destroy()
     table.clear(self.buildingToDependency)
     table.freeze(self.buildingToDependency)
     self.buildingToDependency = nil
+    table.clear(self.shipPieces)
+    self.shipPieces = nil
     --Clean up self
     table.clear(self)
     setmetatable(self, nil)

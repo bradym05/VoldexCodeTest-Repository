@@ -8,7 +8,7 @@ The connection class adds the disconnect functionality to signals, the system is
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
---Convert arguments to a table safely to be stored as a variable (... can only be accessed from outside of its nested closure)
+--Convert arguments to a table safely to be stored as a variable (... can only be accessed from inside of its nested closure)
 local function packArgs(...)
     --Converts tuple into a table without missing any values (like nil)
     return {n = select("#", ...), ...}

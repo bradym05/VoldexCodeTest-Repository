@@ -10,12 +10,12 @@ on camera distance. Uses a particle setting to multiply emit counts.
 local Players = game:GetService("Players")
 
 --Instances
-local player = game.Players.LocalPlayer
-local camera = workspace.CurrentCamera
-local particlePart = Instance.new("Part")
+local player : Player = Players.LocalPlayer
+local camera : Camera = workspace.CurrentCamera
+local particlePart : Part = Instance.new("Part")
 
-local settingsFolder = player:WaitForChild("Settings")
-local particlesSetting = settingsFolder:WaitForChild("Particles")
+local settingsFolder : Folder = player:WaitForChild("Settings")
+local particlesSetting : NumberValue = settingsFolder:WaitForChild("Particles")
 
 --Settings
 local DISTANCE_MAX = 100 -- Maximum distance from camera where particle emit count is constant

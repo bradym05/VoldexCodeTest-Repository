@@ -16,13 +16,15 @@ local TycoonClass = require(ServerScriptService:WaitForChild("TycoonClass"))
 local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 
 --Instances
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
+local getData : RemoteFunction = remotes:WaitForChild("GetData")
+local setData : RemoteEvent = remotes:WaitForChild("SetData")
 
 --DataStore template
 PlayerData.TEMPLATE = {
     Money = 1000,
     Purchased = {},
-    Paycheck = 100,
+    Paycheck = 50,
     MoneyToCollect = 0,
     Settings = {
         GameVolume = 0.75,
@@ -37,14 +39,15 @@ PlayerData.TEMPLATE = {
 local REPLICATED_STATS = { --Put the names and value ClassNames of data to be included in leaderstats here
     Money = "IntValue",
 }
+local REPLICATED_HIDDEN = { --Put the names and value ClassNames of data to be replicated but hidden here
+    Paycheck = "IntValue",
+}
 local CLIENT_ACCESS = { --Data which can be read and changed by players
     "Settings"
 }
 
 --Manipulated
 local playerToTycoon = {}
-local loadedSignals = {}
-local playerToData = {}
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
@@ -54,39 +57,34 @@ local function playerAdded(Player : Player)
     local dataObject = PlayerData.new(Player)
     --Make sure player loaded
     if dataObject then
-        --Check if data was being yielded
-        if loadedSignals[Player] then
-            --Signal that player did not load
-            loadedSignals[Player]:FireOnce(true)
-            --Clean up
-            loadedSignals[Player] = nil
-        end
         --Create tycoon and reference
         local Tycoon = TycoonClass.new(Player)
         playerToTycoon[Player] = Tycoon
-        --Create data reference
-        playerToData[Player] = dataObject
-        --Create leaderstats
+        --Create leaderstats folder
         local leaderstats = Instance.new("Folder")
         leaderstats.Name = "leaderstats"
         leaderstats.Parent = Player
+        --Create hidden stats folder
+        local hiddenstats = Instance.new("Folder")
+        hiddenstats.Name = "hiddenstats"
+        hiddenstats.Parent = Player
         --Loop through all replicated stats
         for name : string, ClassName : string in pairs(REPLICATED_STATS) do
             --Create value object and set loaded value
             local valueObject = Instance.new(ClassName)
             valueObject.Name = name
             valueObject.Value = dataObject:GetData(name)
-            valueObject.Parent = leaderstats
+            --Determine parent
+            if REPLICATED_HIDDEN[name] then
+                valueObject.Parent = hiddenstats
+            else
+                valueObject.Parent = leaderstats
+            end
             --Connect to changes
             dataObject:ListenToChange(name, function(newValue)
                 valueObject.Value = newValue
             end)
         end
-    elseif loadedSignals[Player] then
-         --Signal that player did not load
-         loadedSignals[Player]:FireOnce(false)
-         --Clean up
-         loadedSignals[Player] = nil
     end
 end
 
@@ -95,28 +93,25 @@ local function playerRemoving(Player : Player)
     if playerToTycoon[Player] then
         --Clean up tycoon
         playerToTycoon[Player]:Destroy()
-        --Clean up loaded signal if active
-        if loadedSignals[Player] then
-            loadedSignals[Player]:FireOnce(false)
-        end
         --Remove references
         playerToTycoon[Player] = nil
-        playerToData[Player] = nil
-        loadedSignals[Player] = nil
     end
 end
 
----------------------// PRIVATE CODE \\--------------------
-
---Catch players who may have already loaded
-for _, Player : Player in pairs(Players:GetPlayers()) do
-    task.spawn(playerAdded, Player)
+--Verify data access
+local function verifyAccess(dataName : string)
+    --Check if data is in the CLIENT_ACCESS table
+    if dataName and table.find(CLIENT_ACCESS, dataName) then
+        return true
+    else
+        return false
+    end
 end
 
---Connect to GetData remote
-Remotes:WaitForChild("GetData").OnServerInvoke = function(Player : Player, dataName : string)
+--Get data remote function
+local function getDataFunction(Player : Player, dataName : string)
     --Verify this is data accessible by the client
-    if dataName and table.find(CLIENT_ACCESS, dataName) then
+    if verifyAccess(dataName) then
         --Get data
         local data = PlayerData.getDataObject(Player)
         --Verify data exists
@@ -127,10 +122,10 @@ Remotes:WaitForChild("GetData").OnServerInvoke = function(Player : Player, dataN
     end
 end
 
---Connect to SetData remote
-Remotes:WaitForChild("SetData").OnServerEvent:Connect(function(Player : Player, dataName : string, value : any)
+--Set data remote event
+local function setDataFunction(Player : Player, dataName : string, value : any)
     --Verify this is data accessible by the client
-    if dataName and table.find(CLIENT_ACCESS, dataName) then
+    if verifyAccess(dataName) then
         --Get data
         local data = PlayerData.getDataObject(Player)
         --Verify data exists
@@ -139,8 +134,24 @@ Remotes:WaitForChild("SetData").OnServerEvent:Connect(function(Player : Player, 
             data:SetData(dataName, value)
         end
     end
-end)
+end
+
+---------------------// PRIVATE CODE \\--------------------
+
+--Combine REPLICATED_STATS and REPLICATED_HIDDEN
+for i,v in pairs(REPLICATED_HIDDEN) do
+    REPLICATED_STATS[i] = v
+end
+
+--Catch players who may have already loaded
+for _, Player : Player in pairs(Players:GetPlayers()) do
+    task.spawn(playerAdded, Player)
+end
+
+--Remote functions
+getData.OnServerInvoke = getDataFunction
 
 --Connections
 Players.PlayerAdded:Connect(playerAdded)
 Players.PlayerRemoving:Connect(playerRemoving)
+setData.OnServerEvent:Connect(setDataFunction)

@@ -40,6 +40,8 @@ Other Notes:<br />
 -Replaced tycoon baseplate with floating islands.<br />
 -Rotated angle of TycoonBase and Buildings to start with a pivot orientation of (0, 0, 0).<br />
 -Added attribute "Ship" to all components of the pirate ship.<br />
+-Downloaded vault icon from Vecteezy: https://www.vecteezy.com/vector-art/356727-vector-vault-icon<br />
+-Designed paycheck button and GUI<br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.<br />
 
@@ -71,6 +73,7 @@ MainHandler (was TycoonHandler) (PadService replacement): <br />
 -Manages a leaderstats folder for client replication. <br />
 -Leaderstats are simply a reflection of data stored on the server. <br />
 -Added a saving MoneyToCollect value for Paycheck Machines. <br />
+-Also manages a hidden stats folder handled the same as leaderstats. <br />
 
 -Created a tycoon template to be cloned for each player. <br />
 -Seperated buildings from template to keep only one copy in memory. <br />
@@ -221,3 +224,5 @@ Music:<br />
 -Plays each song until it ends and plays the next song.<br />
 -Once playlist is finished, reshuffles.<br />
 -Pauses music if volume is muted.<br />
+
+PaycheckHandler:<br />

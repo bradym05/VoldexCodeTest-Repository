@@ -10,21 +10,21 @@ local GUI = require(ReplicatedStorage:WaitForChild("GUI"))
 local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
 
 --Instances
-local player = game.Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-local mainInterface = playerGui:WaitForChild("MainInterface")
-local popup = mainInterface:WaitForChild("Popup")
-local settingsFrame = popup:WaitForChild("Container"):WaitForChild("Settings")
-local audioFrame = settingsFrame:WaitForChild("Audio")
-local toggleFrame = settingsFrame:WaitForChild("Toggle")
-local particleSlider = settingsFrame:WaitForChild("Particles")
+local player : Player = Players.LocalPlayer
+local playerGui : PlayerGui = player:WaitForChild("PlayerGui")
+local mainInterface : Frame = playerGui:WaitForChild("MainInterface")
+local popup : Frame = mainInterface:WaitForChild("Popup")
+local settingsFrame : Frame = popup:WaitForChild("Container"):WaitForChild("Settings")
+local audioFrame : Frame = settingsFrame:WaitForChild("Audio")
+local toggleFrame : Frame = settingsFrame:WaitForChild("Toggle")
+local particleSlider : Frame = settingsFrame:WaitForChild("Particles")
 
-local sounds = ReplicatedStorage:WaitForChild("Sounds")
-local clickSound = sounds:WaitForChild("SingleClick")
+local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
+local clickSound : Sound = sounds:WaitForChild("SingleClick")
 
-local remotes = ReplicatedStorage:WaitForChild("Remotes")
-local getData = remotes:WaitForChild("GetData")
-local setData = remotes:WaitForChild("SetData")
+local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
+local getData : RemoteFunction = remotes:WaitForChild("GetData")
+local setData : RemoteEvent = remotes:WaitForChild("SetData")
 
 --Initial settings
 local settingsData = getData:InvokeServer("Settings")
@@ -66,6 +66,10 @@ local function sliderSetup(sliderSection : Frame, respondingObject : any?, respo
     local slider = GUI.Slider(sliderGui, progressBar)
     --Set to saved volume without signaling a change
     slider:SetValue(settingsData[settingName], true)
+    --Update initial responding value
+    if respondingObject and respondingProperty then
+        respondingObject[respondingProperty] = settingsData[settingName]
+    end
     --Connect to value changed
     slider.sliderChanged:Connect(function(newValue : number)
         --Update responding value

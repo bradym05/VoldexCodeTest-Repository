@@ -5,10 +5,10 @@ local SoundService = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --Instances
-local musicGroup = SoundService:WaitForChild("MUSIC")
+local musicGroup : SoundGroup = SoundService:WaitForChild("MUSIC")
 
-local sounds = ReplicatedStorage:WaitForChild("Sounds")
-local music = sounds:WaitForChild("Music")
+local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
+local music : Folder = sounds:WaitForChild("Music")
 
 --Manipulated
 local paused = false

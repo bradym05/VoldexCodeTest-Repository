@@ -38,7 +38,6 @@ function Slider.new(base : ImageButton, progressBar : Frame)
     --Connections for GC
     self.connections = {}
     setmetatable(self, Slider)
-
     --Connect to input
     local inputBegan
     inputBegan = base.InputBegan:Connect(function(input : InputObject)

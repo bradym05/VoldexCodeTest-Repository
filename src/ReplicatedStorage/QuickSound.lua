@@ -11,8 +11,8 @@ local SoundService = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --Instances
-local sounds = ReplicatedStorage:WaitForChild("Sounds")
-local soundPart = Instance.new("Part")
+local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
+local soundPart : Part = Instance.new("Part")
 
 --Settings
 local SOUND_DEFAULTS = { --Default sound properties (if set to default)
@@ -20,13 +20,6 @@ local SOUND_DEFAULTS = { --Default sound properties (if set to default)
     RollOffMaxDistance = 500,
     RollOffMinDistance = 10,
     Volume = 0.5,
-}
-
---Controlled
-local hasCFrame = { --Some relavant instance classes which sounds can inherit CFrame from (https://create.roblox.com/docs/reference/engine/classes/Sound)
-    "BasePart",
-    "Attachment",
-    "MeshPart",
 }
 
 --Manipulated
@@ -52,16 +45,16 @@ local function QuickSound(base : Sound | string, parentOrCFrame : (Instance | CF
         --Get SoundGroup instance if group is a string (SoundGroup will be nil if not found and therefore set automatically)
         if group and type(group) == "string" then
             group = SoundService:FindFirstChild(group)
-        elseif not group then
-            --Allow for nil to be cached
-            group = "nil"
+        else
+            --Set group to type for cache
+            group = (not parentOrCFrame and "nil") or (typeof(parentOrCFrame) == "Instance" and parentOrCFrame.ClassName) or typeof(parentOrCFrame)
         end
         --Automatically get a SoundGroup if none was provided, or provided is not a valid SoundGroup
         if not group or typeof(group) ~= "Instance" or not group:IsA("SoundGroup") then
             --Set cache if not set
             if not groupCache[group] then
                 --Determine if parentOrCFrame is a CFrame or is a instance class with a CFrame
-                if parentOrCFrame and (typeof(parentOrCFrame) == "CFrame" or (typeof(parentOrCFrame) == "Instance" and table.find(hasCFrame, parentOrCFrame.ClassName))) then
+                if parentOrCFrame and (typeof(parentOrCFrame) == "CFrame" or (typeof(parentOrCFrame) == "Instance" and (parentOrCFrame:IsA("BasePart") or parentOrCFrame:IsA("Attachment")))) then
                     --Sound is being played in 3D space so is likely from the game
                     groupCache[group] = SoundService.GAME
                 else

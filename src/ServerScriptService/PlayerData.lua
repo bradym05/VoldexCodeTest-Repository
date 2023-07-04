@@ -18,9 +18,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 
 --Current save
-local SaveFile = DataStoreService:GetDataStore("Save_11")
+local SaveFile : DataStore = DataStoreService:GetDataStore("Save_11")
 --Active saving store
-local SaveStore = MemoryStoreService:GetSortedMap("ActiveSaving")
+local SaveStore : MemoryStoreSortedMap = MemoryStoreService:GetSortedMap("UserSaving")
 
 --Settings
 local RETRY_DELAY = 5
@@ -43,7 +43,7 @@ local translatedRequests = {
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
---Convert arguments to a table safely to be stored as a variable (... can only be accessed from outside of its nested closure)
+--Convert arguments to a table safely to be stored as a variable (... can only be accessed from inside of its nested closure)
 local function packArgs(...)
     --Converts tuple into a table without missing any values (like nil)
     return {n = select("#", ...), ...}
