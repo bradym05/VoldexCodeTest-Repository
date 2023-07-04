@@ -41,7 +41,10 @@ Other Notes:<br />
 -Rotated angle of TycoonBase and Buildings to start with a pivot orientation of (0, 0, 0).<br />
 -Added attribute "Ship" to all components of the pirate ship.<br />
 -Downloaded vault icon from Vecteezy: https://www.vecteezy.com/vector-art/356727-vector-vault-icon<br />
--Designed paycheck button and GUI<br />
+-Designed paycheck button and GUI.<br />
+-Imported and resized gold coins material from Sketchfab: https://sketchfab.com/3d-models/gold-coins-material-a334ce7cfb8e449391a181c2738ecd00<br />
+-Imported low poly coin from Sketchfab: https://sketchfab.com/3d-models/lowpoly-gold-coin-34794c00e9d140f6b86e930fef18b009<br />
+-Created coin pile mesh in blender.<br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.<br />
 
@@ -226,3 +229,8 @@ Music:<br />
 -Pauses music if volume is muted.<br />
 
 PaycheckHandler:<br />
+
+-Renders a viewport frame to visualize player's paycheck.<br />
+-Creates a pile of coins relative to the size of player's paycheck.<br />
+-Animates coins falling and increases pile size based on changes in paycheck.<br />
+-Does not animate unless frame is open.<br />

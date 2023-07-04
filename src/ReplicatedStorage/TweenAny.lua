@@ -26,7 +26,13 @@ local renderSteppedConnection
 
 --Function to lerp model
 typeFunctions["Model"] = function(item : Model, info : table, progress : number)
-    item:PivotTo(info.StartValue:Lerp(info.Goal, progress))
+    if typeof(info.Goal) == "CFrame" then
+        --Pivot towards goal cframe
+        item:PivotTo(info.StartValue:Lerp(info.Goal, progress))
+    else
+        --Scale towards goal size using number lerp function
+        item:ScaleTo(typeFunctions["number"](nil, info, progress))
+    end
     return item
 end
 
@@ -112,7 +118,7 @@ local function renderStepped(deltaTime : number)
                     continue
                 end
                 --Tween item based on type
-                item = typeFunctions[itemType](item, info, progress)
+                typeFunctions[itemType](item, info, progress)
                 --End tween if completed
                 if progress == 1 then
                     --Check if tween needs to reverse
@@ -143,9 +149,6 @@ local function renderStepped(deltaTime : number)
         end
         --Remove all completed tweens from dictionary (must be done outside of above loop)
         for _, item in pairs(completed) do
-            if tweens[item] and type(tweens[item]) == "table" then
-                table.clear(tweens[item])
-            end
             tweens[item] = nil
         end
         --Clean up completed table
@@ -166,15 +169,22 @@ end
 local TweenAny = {}
 
 --Tweens model position via lerping
-function TweenAny:TweenModel(model : Model, goal : CFrame, length : number, reverses : boolean?)
+function TweenAny:TweenModel(model : Model, goal : CFrame | number, length : number, reverses : boolean?)
     if model:IsA("Model") then
-        --Get start CFrame
-        local startCFrame = model:GetPivot()
+        --Initialize start value
+        local startValue
+        --Set start value by type
+        if typeof(goal) == "CFrame" then
+            --Get start CFrame
+            startValue = model:GetPivot()
+        else
+            startValue = model:GetScale()
+        end
         --Create custom signal
         local signal = CustomSignal.new()
         --Reference model to info
         tweens[model] = {
-            StartValue = startCFrame,
+            StartValue = startValue,
             Goal = goal,
             Length = length,
             Reverses = reverses,
@@ -215,10 +225,12 @@ end
 
 --Tween numbers via lerping and update with new or provided signal
 function TweenAny:TweenNumber(number : number, goal : number, length : number, signal : table?, reverses : boolean?)
-    --Set signal to be destroyed if created here
+    --Set signal to be destroyed if created here, or kept if given
     local keepSignal = signal ~= nil
     --Create custom signal if none is provided
-    signal = signal or CustomSignal.new()
+    if not signal then
+        signal = CustomSignal.new()
+    end
     --Reference number to info
     tweens[number] = {
         StartValue = number,
