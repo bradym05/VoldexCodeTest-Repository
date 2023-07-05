@@ -7,6 +7,7 @@ Pad dependencies must refer to the purchaseable building. Multiple pads may be d
 ------------------// PRIVATE VARIABLES \\------------------
 
 --Services
+local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -14,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 --Modules
 local PlayerData = require(ServerScriptService:WaitForChild("PlayerData"))
+local ShipClass = require(ServerScriptService:WaitForChild("ShipClass"))
 local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 
 --Instances
@@ -77,6 +79,25 @@ local function getSlot()
     return slot
 end
 
+--Sets collisions of group to only one collision group, or disables collisions with all if no group is provided
+local function setCollisionGroupExclusive(exclusiveGroupName : string, collideWithName : string?)
+    --Iterate over all registered groups
+    for _, otherGroupTable : table in pairs(PhysicsService:GetRegisteredCollisionGroups()) do
+        --GetRegisteredCollisionGroups returns an array with group mask and name, get name
+        local otherGroupName : string = otherGroupTable.name
+        --Make sure this is not the provided group
+        if otherGroupName and otherGroupName ~= exclusiveGroupName then
+            --Disable collisions with exclusive group
+            PhysicsService:CollisionGroupSetCollidable(exclusiveGroupName, otherGroupName, false)
+        end
+    end
+    --Check if a group was provided
+    if collideWithName then
+        --Enable collisions
+        PhysicsService:CollisionGroupSetCollidable(exclusiveGroupName, collideWithName, true)
+    end
+end
+
 ---------------------// TYCOON CLASS \\-----------------------
 
 local Tycoon = {}
@@ -106,52 +127,55 @@ function Tycoon.new(Player : Player)
     self.padStorage.Parent = game.ServerStorage
     --Initialize ship pieces table
     self.shipPieces = {}
+    --Initialize loaded variable
+    self.loaded = false
     setmetatable(self, Tycoon)
 
     --// INITIAL SETUP CODE \\--
 
     --Get first available slot
     self.slot = getSlot()
-    --Correctly position tycoon 
-    self.tycoonModel:PivotTo(translateCFrame(self.tycoonModel:GetPivot(), self.slot))
-    --Name tycoon to UserId and parent
-    self.tycoonModel.Name = self.DataObject.Key
-    self.tycoonModel.Parent = tycoonsFolder
-    --Load purchased buildings (after pivot)
-    self:Fulfill(self.DataObject:GetData("Purchased") or {}, false)
-    --Initialize pads (after purchases have loaded)
-    for _, Pad : Model in pairs(self.tycoonModel.Pads:GetChildren()) do
-        self:PadSetup(Pad)
-    end
-    --Create collision groups and set collisions
-    PhysicsService:RegisterCollisionGroup(self.characterGroup)
-    PhysicsService:RegisterCollisionGroup(self.padsGroup)
-    --Set character and pads to collide
-    PhysicsService:CollisionGroupSetCollidable(self.characterGroup, self.padsGroup, true)
-    --Make sure that pads can only collide with the character
-    for _, otherGroupTable in pairs(PhysicsService:GetRegisteredCollisionGroups()) do
-        --GetRegisteredCollisionGroups returns an array with group mask and name, get name
-        local otherGroup = otherGroupTable.name
-        --Check that this isn't the pads or character group
-        if otherGroup ~= self.characterGroup and otherGroup ~= self.padsGroup then
-            --Disable collisions with pads
-            PhysicsService:CollisionGroupSetCollidable(self.padsGroup, otherGroup, false)
+    --getSlot() function may yield, check if player left
+    if Player and Player:IsDescendantOf(Players) then
+        --Correctly position tycoon
+        self.tycoonModel:PivotTo(translateCFrame(self.tycoonModel:GetPivot(), self.slot))
+        --Name tycoon to UserId and parent
+        self.tycoonModel.Name = self.DataObject.Key
+        self.tycoonModel.Parent = tycoonsFolder
+        --Load purchased buildings (after pivot)
+        self:Fulfill(self.DataObject:GetData("Purchased") or {})
+        --Initialize pads after purchases have loaded (for dependencies)
+        for _, Pad : Model in pairs(self.tycoonModel.Pads:GetChildren()) do
+            self:PadSetup(Pad)
         end
-    end
-    --Initialize Paycheck Machince
-    self:PaycheckSetup()
-    --Set respawn location
-    Player.RespawnLocation = self.tycoonModel.Essentials.SpawnLocation
-    --Connect Tycoon:CharacterAdded() to Player.CharacterAdded
-    local characterAddedConnection
-    characterAddedConnection = Player.CharacterAdded:Connect(function(character : Model)
-        self:CharacterAdded(character)
-    end)
-    --Load first character
-    Player:LoadCharacter()
-    --Add to connections for GC
-    table.insert(self.connections, characterAddedConnection)
-    return self
+        --Set loaded variable to true now that pads and purchases are loaded
+        self.loaded = true
+        --Call check ship method after loading (ship pieces are reparented which can cause incorrect dependency checks)
+        self:CheckShip()
+        --Create collision groups and set collisions
+        PhysicsService:RegisterCollisionGroup(self.characterGroup)
+        PhysicsService:RegisterCollisionGroup(self.padsGroup)
+        --Set pads to only collide with character
+        setCollisionGroupExclusive(self.padsGroup, self.characterGroup)
+        --Initialize Paycheck Machince
+        self:PaycheckSetup()
+        --Set respawn location
+        Player.RespawnLocation = self.tycoonModel.Essentials.SpawnLocation
+        --Connect Tycoon:CharacterAdded() to Player.CharacterAdded
+        local characterAddedConnection
+        characterAddedConnection = Player.CharacterAdded:Connect(function(character : Model)
+            self:CharacterAdded(character)
+        end)
+        --Add to connections for GC
+        table.insert(self.connections, characterAddedConnection)
+        --Load first character
+        Player:LoadCharacter()
+        return self
+    else
+        --Player left the game, destroy tycoon and cancel setup
+        self:Destroy()
+        return
+     end
 end
 
 --Clean up
@@ -189,10 +213,26 @@ function Tycoon:Destroy()
     self.buildingToDependency = nil
     table.clear(self.shipPieces)
     self.shipPieces = nil
+    --Remove reference to ship object
+    self.shipObject = nil
     --Clean up self
     table.clear(self)
     setmetatable(self, nil)
+    --Prevent any methods from calling and indicate tycoon is inactive
     table.freeze(self)
+end
+
+--Ship creation method
+function Tycoon:CheckShip()
+    --Check if all ship pieces are purchased, and tycoon is loaded to keep dependencies accurate. Make sure ship is not already created
+    if self.loaded and not self.shipObject and #self.shipPieces >= requiredShip then
+        --Create ship object
+        self.shipObject = ShipClass.new(self.Player, self.shipPieces)
+        --Set character of ship object if loaded
+        if self.character then
+            self.shipObject:SetCharacter(self.character)
+        end
+    end
 end
 
 --Set up paychecks and collection
@@ -244,6 +284,12 @@ function Tycoon:CharacterAdded(character : Model)
     --Declare connection variables
     local descendantAddedConnection
     local removingConnection
+    --Update character variable
+    self.character = character
+    --Set ship object character if created
+    if self.shipObject then
+        self.shipObject:SetCharacter(character)
+    end
     --Disconnect when character is removing
     removingConnection = self.Player.CharacterRemoving:Connect(function(removing : Model)
         --Make sure the removing character is the defined character
@@ -389,6 +435,8 @@ function Tycoon:Fulfill(purchased : any)
         if building:GetAttribute("Ship") then
             --Update table of ship pieces
             table.insert(self.shipPieces, building)
+            --Check ship
+            self:CheckShip()
         end
     end
 end

@@ -45,8 +45,20 @@ Other Notes:<br />
 -Imported and resized gold coins material from Sketchfab: https://sketchfab.com/3d-models/gold-coins-material-a334ce7cfb8e449391a181c2738ecd00<br />
 -Imported low poly coin from Sketchfab: https://sketchfab.com/3d-models/lowpoly-gold-coin-34794c00e9d140f6b86e930fef18b009<br />
 -Created coin pile mesh in blender.<br />
+-Created a part "ShipPlane" and attachment "Plane" for pirate ship PlaneConstraints.<br />
+-Disabled air balloon collisions, made massless, and set collision fidelity to box. <br />
+-Set all mesh render fidelities to Automatic. Automatic render fidelity is actually more performant than performance. <br />
+-Set up Motor6D inside of steering wheel for turning. <br />
+-Created ship particles using a toolbox particle pack (https://create.roblox.com/marketplace/asset/10198615035/Reis-Particle-Pack). <br />
+-Set up Motor6D inside of air balloon fan for spinning animation. <br />
+-Created trails inside of ship and ship fan. <br />
+-Created steering animations. <br />
+-Made entire ship massless. <br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.<br />
+
+Network ownership of pirate ships will be granted to the owner of each ship. This brings up concerns regarding security. In order to mitigate these concerns, the server will perform
+checks ensuring that the ship is only moving how it is supposed to.<br />
 
 PadService:<br />
 
@@ -111,6 +123,8 @@ TycoonClass: <br />
 -Player's receive their paychecks via one core loop every set interval instead of indiviudal loops for each tycoon. <br />
 -Pad purchase attempts fire an event to the player to animate the pad. <br />
 -Pads are destroyed after 5 seconds to give player time for animation. <br />
+-If a player leaves while waiting for a slot, tycoon will cancel setup and destroy. <br />
+-When tycoon is destroyed, the slot is made available again and the next in queue is notified; this ensures that slots do not become permanently unavailable. <br />
 
 CustomSignal:<br />
 
@@ -242,6 +256,38 @@ PaycheckHandler:<br />
 -Creates a button object from the GUI module to request upgrades.<br />
 -Animates price of upgrade on change.<br />
 -Indicates purchase success or failure to the player.<br />
+
+ShipClass:<br />
+
+-Converts table of ship pieces into a physics assembly with weld constraints.<br />
+-Does not weld parts which are already attached to the assembly.<br />
+-Creates a plane constraint to prevent ships from moving up and down.<br />
+-Creates linear velocity and angular velocity actuators for movement.<br />
+-Mounts and dismounts players to ship via weld constraint creation/deletion.<br />
+-Connects to mount requests from client and validates that requested value is not the set value.<br />
+-Grants player network ownership of the ship for movement when mounted.<br />
+-Revokes network ownership by anchoring the ship when dismounted.<br />
+
+ShipReplicator:<br />
+
+-Disables proximity prompt.<br />
+-Gets velocities, Motor6Ds, and trails for animation.<br />
+
+PlayerShip:<br />
+
+-Enables proximity prompt.<br />
+-Listens to changes in "Mounted" attribute.<br />
+-Binds movement inputs to ContextActionService when mounted and unbinds on dismount.<br />
+-Tracks movement direction from inputs.<br />
+-Applies movement direction to ship's linear and angular velocity on change.<br />
+-Plays and changes steering animations depending on movement direction.<br />
+-Turns ship wheel to move with animations.<br />
+
+ShipsClient:<br />
+
+-Sets up existing and newly created ships.<br />
+-Determines whether to create a ShipReplicator or PlayerShip object for ships.<br />
+-Destroys ship objects when ship is destroying. <br />
 
 Misc:<br />
 

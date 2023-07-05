@@ -30,6 +30,7 @@ local REPLICATED_STATS = { --Put the names and value ClassNames of data to be in
 local REPLICATED_HIDDEN = { --Put the names and value ClassNames of data to be replicated but hidden here
     Paycheck = "IntValue",
     UpgradeCost = "IntValue",
+    Ticket = "BoolValue",
 }
 local CLIENT_ACCESS = { --Data which can be read and changed by players
     "Settings"
@@ -43,6 +44,7 @@ PlayerData.TEMPLATE = {
     Paycheck = BASE_PAYCHECK,
     UpgradeCost = BASE_UPGRADE_PRICE,
     MoneyToCollect = 0,
+    Ticket = false,
     Settings = {
         GameVolume = 0.75,
         GuiVolume = 0.75,
@@ -184,11 +186,11 @@ for _, Player : Player in pairs(Players:GetPlayers()) do
     task.spawn(playerAdded, Player)
 end
 
---Remote functions
-getData.OnServerInvoke = getDataFunction
-
 --Connections
 Players.PlayerAdded:Connect(playerAdded)
 Players.PlayerRemoving:Connect(playerRemoving)
 setData.OnServerEvent:Connect(setDataFunction)
 upgradeEvent.OnServerEvent:Connect(upgradePaycheckFunction)
+
+--Remote functions
+getData.OnServerInvoke = getDataFunction
