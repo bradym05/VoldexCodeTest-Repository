@@ -1,5 +1,5 @@
 # VoldexCodeTest-Repository
- 
+
 Initial Gameplay Analysis:<br />
 
 -In the output, many Sound objects throw the error "failed to load". These should be deleted to avoid clutter and unnecessary memory usage. <br />
@@ -54,6 +54,7 @@ Other Notes:<br />
 -Created trails inside of ship and ship fan. <br />
 -Created steering animations. <br />
 -Made entire ship massless. <br />
+-Removed all value objects. <br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.<br />
 
@@ -125,6 +126,9 @@ TycoonClass: <br />
 -Pads are destroyed after 5 seconds to give player time for animation. <br />
 -If a player leaves while waiting for a slot, tycoon will cancel setup and destroy. <br />
 -When tycoon is destroyed, the slot is made available again and the next in queue is notified; this ensures that slots do not become permanently unavailable. <br />
+-Checks if player has purchased all ship parts, and claimed a ticket, then allows their ship to be flown. <br />
+-Only unlocks ticket cabin when all other buildings have been purchased. <br />
+-Creates a proximity prompt inside of the ticket cabin to claim ticket. <br />
 
 CustomSignal:<br />
 
@@ -166,6 +170,8 @@ Animations:<br />
 -Checks build animations setting.<br />
 -Animates new buildings by moving them to a random location and tweening back.<br />
 -Plays building sounds using QuickSound.<br />
+-Tells player they must buy the ticket booth to fly their ship.<br />
+-Tells player to claim ticket once they have purchased the ticket booth. <br />
 
 QuickSound:<br />
 

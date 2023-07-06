@@ -13,6 +13,7 @@ local TweenService = game:GetService("TweenService")
 
 --Modules
 local ShipReplicator = require(ReplicatedStorage:WaitForChild("ShipReplicator"))
+local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
 local UserInputService = game:GetService("UserInputService")
 
 --Instances
@@ -29,6 +30,10 @@ local steerAnimations : table = steerAnimationsFolder:GetChildren()
 
 local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
 local dismountRemote : RemoteEvent = remotes:WaitForChild("Dismount")
+
+local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
+local swishSoundIn : Sound = sounds:WaitForChild("SwishIn")
+local swishSoundOut : Sound = sounds:WaitForChild("SwishOut")
 
 --Settings
 local STEER_INPUTS = { --Inputs which can steer the ship
@@ -317,6 +322,7 @@ function PlayerShip:ToggleMount(toggle : boolean?)
         self.humanoid.PlatformStand = true
         --Tween in dismount info
         dismountInfoTweenIn:Play()
+        QuickSound(swishSoundIn)
     else
         --Iterate over all loaded tracks
         for _, track : AnimationTrack in pairs(self.animations) do
@@ -331,6 +337,7 @@ function PlayerShip:ToggleMount(toggle : boolean?)
         self:ToggleMotors(false)
         --Tween out dismount info
         dismountInfoTweenOut:Play()
+        QuickSound(swishSoundOut)
     end
 end
 

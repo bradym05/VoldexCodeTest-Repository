@@ -26,6 +26,9 @@ local priceLabelTemplate : BillboardGui = ServerStorage:WaitForChild("PriceLabel
 local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
 local padTouchedRemote : RemoteEvent = remotes:WaitForChild("PadTouched")
 
+local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
+local ticketRemote : RemoteEvent = remotes:WaitForChild("TicketClaimed")
+
 --Settings
 local TYCOON_ANGLE = 45 --Angle between tycoons (in degrees)
 local CIRCLE_RADIUS = 300 --Radius of tycoon "circle"
@@ -42,7 +45,9 @@ local availableSlots = {}
 local cachedBuildings = {}
 local tycoonQueue = {}
 local paychecks = {}
+local allBuildings = tycoonBuildings:GetChildren()
 local requiredShip = 0
+local totalBuildings = #allBuildings
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
@@ -222,10 +227,10 @@ function Tycoon:Destroy()
     table.freeze(self)
 end
 
---Ship creation method
+--Checks if conditions are met to unlock ship and creates ship object
 function Tycoon:CheckShip()
-    --Check if all ship pieces are purchased, and tycoon is loaded to keep dependencies accurate. Make sure ship is not already created
-    if self.loaded and not self.shipObject and #self.shipPieces >= requiredShip then
+    --Check if all ship pieces are purchased, and tycoon is loaded to keep dependencies accurate. Make sure ship is not already created. Make sure player has claimed ticket.
+    if self.loaded and not self.shipObject and self.DataObject:GetData("Ticket") == true and #self.shipPieces >= requiredShip then
         --Create ship object
         self.shipObject = ShipClass.new(self.Player, self.shipPieces)
         --Set character of ship object if loaded
@@ -382,6 +387,7 @@ function Tycoon:PadSetup(Pad : Model)
     --Initialize variables
     local target = Pad:GetAttribute("Target")
     local dependency = Pad:GetAttribute("Dependency")
+    local requiresAll = Pad:GetAttribute("RequiresAll")
     --Make sure this pad hasn't been purchased already
     if self.purchasedFolder:FindFirstChild(target) then
         --Remove pad
@@ -389,19 +395,72 @@ function Tycoon:PadSetup(Pad : Model)
         --Cancel setup
         return
     end
-    --Check if dependency is purchased
-    if not dependency or self.purchasedFolder:FindFirstChild(dependency) then
-        self:ActivatePad(Pad, target)
-    else
-        --Hide pad
-        Pad.Parent = self.padStorage
-        --Check if dependency table exists
-        if not self.buildingToDependency[dependency] then
-            --Create table
-            self.buildingToDependency[dependency] = {}
+    --Check if requires all other buildings
+    if requiresAll then
+        --Get total purchased
+        local purchasedTotal = #self.purchasedFolder:GetChildren()
+        --Check if all other buildings are purchased
+        if purchasedTotal >= totalBuildings then
+            self:ActivatePad(Pad, target)
+        else
+            --Hide pad
+            Pad.Parent = self.padStorage
+            --Create table if not already created
+            if not self.requiresAll then
+                self.requiresAll = {}
+            end
+            --Indicate that this pad is waiting for all other buildings
+            table.insert(self.requiresAll, Pad)
         end
-        --Indicate that this pad is waiting for dependency to be built
-        table.insert(self.buildingToDependency[dependency], Pad)
+    else
+        --Check if dependency is purchased
+        if not dependency or self.purchasedFolder:FindFirstChild(dependency) then
+            self:ActivatePad(Pad, target)
+        else
+            --Hide pad
+            Pad.Parent = self.padStorage
+            --Check if dependency table exists
+            if not self.buildingToDependency[dependency] then
+                --Create table
+                self.buildingToDependency[dependency] = {}
+            end
+            --Indicate that this pad is waiting for dependency to be built
+            table.insert(self.buildingToDependency[dependency], Pad)
+        end
+    end
+end
+
+--Sets up ticket cabin
+function Tycoon:TicketCabinSetup(cabin : Model)
+    --Make sure player has not already claimed their ticket
+    if self.DataObject:GetData("Ticket") == false then
+        --Get prompt part
+        local promptPart : BasePart = cabin:WaitForChild("PromptPart")
+        --Create proximity prompt
+        local ticketPrompt : ProximityPrompt = Instance.new("ProximityPrompt")
+        ticketPrompt.ObjectText = "Ticket Cabin"
+        ticketPrompt.ActionText = "Claim Ticket"
+        ticketPrompt.RequiresLineOfSight = false
+        ticketPrompt.HoldDuration = 1
+        ticketPrompt.Parent = promptPart
+        --Listen to prompt triggered
+        local promptTriggered
+        promptTriggered = ticketPrompt.Triggered:Connect(function(playerWhoTriggered)
+            --Check that owner of tycoon triggered prompt
+            if playerWhoTriggered == self.Player then
+                --Disconnect and destroy prompt
+                promptTriggered:Disconnect()
+                ticketPrompt:Destroy()
+                --Grant ticket
+                self.DataObject:SetData("Ticket", true)
+                --Tell player they have received their ticket
+                ticketRemote:FireClient(self.Player)
+                --Check ship
+                self:CheckShip()
+            end
+        end)
+        --Add to table of connects for gc
+        table.insert(self.connections, promptTriggered)
     end
 end
 
@@ -438,6 +497,22 @@ function Tycoon:Fulfill(purchased : any)
             --Check ship
             self:CheckShip()
         end
+        --Check if this is the ticket cabin
+        if buildingName == "Ticket_Cabin" then
+            --Setup ticket cabin
+            self:TicketCabinSetup(building)
+        end
+        --Check if enough buildings have been purchased to unlock pads that require all
+        if self.requiresAll and #self.purchasedFolder:GetChildren() >= totalBuildings and #self.requiresAll > 0 then
+            --Activate pads
+            for _, unlockedPad : Model in pairs(self.requiresAll) do
+                self:ActivatePad(unlockedPad, unlockedPad:GetAttribute("Target"))
+            end
+            --Clear table
+            table.clear(self.requiresAll)
+            --Remove reference
+            self.requiresAll = nil
+        end
     end
 end
 
@@ -461,6 +536,15 @@ for _, building : Model in pairs(tycoonBuildings:GetChildren()) do
             --Update number of required ship pieces
             requiredShip += 1
         end
+    end
+end
+
+--Loop through pads to set total buildings count
+for _, Pad : Model in pairs(tycoonTemplate.Pads:GetChildren()) do
+    --Check if pad requires all
+    if Pad:GetAttribute("RequiresAll") then
+        --Remove from total
+        totalBuildings -= 1
     end
 end
 

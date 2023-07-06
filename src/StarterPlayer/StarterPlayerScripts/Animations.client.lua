@@ -19,15 +19,23 @@ local buildings : Folder = playerTycoon:WaitForChild("Purchased")
 
 local particles : Folder = ReplicatedStorage:WaitForChild("Particles")
 local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
+local buildSounds : table = sounds:WaitForChild("BuildSounds"):GetChildren()
+local swishSounds : table = sounds:WaitForChild("SwishSounds"):GetChildren()
+local swishSoundIn : Sound = sounds:WaitForChild("SwishIn")
+local swishSoundOut : Sound = sounds:WaitForChild("SwishOut")
+local ticketClaimedSound : Sound = sounds:WaitForChild("TicketClaimed")
 
 local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
 local padTouchedRemote : RemoteEvent = remotes:WaitForChild("PadTouched")
-
-local buildSounds : table = sounds:WaitForChild("BuildSounds"):GetChildren()
-local swishSounds : table = sounds:WaitForChild("SwishSounds"):GetChildren()
+local ticketRemote : RemoteEvent = remotes:WaitForChild("TicketClaimed")
 
 local settingsFolder : Folder = player:WaitForChild("Settings")
 local buildAnimationsSetting : BoolValue = settingsFolder:WaitForChild("BuildAnimations")
+
+local playerGui : PlayerGui = player:WaitForChild("PlayerGui")
+local mainInterface : ScreenGui = playerGui:WaitForChild("MainInterface")
+local shipInfo : TextLabel = mainInterface:WaitForChild("ShipInfo")
+local ticket : ImageLabel = mainInterface:WaitForChild("Ticket")
 
 --Settings
 local BUTTON_SOUND = sounds:WaitForChild("ButtonPress") -- Sound played upon stepping on a pad
@@ -45,6 +53,14 @@ local padTransparencyTF = TweenInfo.new(0.75, Enum.EasingStyle.Quad, Enum.Easing
 local padTransparencyGoal = {Transparency = 1}
 
 local purchasePressTF = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut) -- Same as buttonTF but no reverse
+
+local shipInfoTF = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.InOut)
+local shipInfoTweenIn = TweenService:Create(shipInfo, shipInfoTF, {Position = UDim2.new(0.5, 0, 0.05, 0)})
+local shipInfoTweenOut = TweenService:Create(shipInfo, shipInfoTF, {Position = UDim2.new(0.5, 0, -0.5, 0)})
+
+local ticketTF = TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.InOut)
+local ticketTweenIn = TweenService:Create(ticket, ticketTF, {Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0.292, 0, 0.359, 0), Rotation = 0})
+local ticketTweenOut = TweenService:Create(ticket, ticketTF, {Position = UDim2.new(0.5, 0, 1.5, 0), Size = UDim2.new(0.195, 0, 0.239, 0), Rotation = 45})
 
 --Particles
 local coinExplosion = ParticleHandler.new(particles:WaitForChild("CoinExplosion"))
@@ -196,9 +212,35 @@ local function animateBuilding(building : Model)
             end)
         end
     end
+    --Update text if this is the ticket cabin
+    if building.Name == "Ticket_Cabin" then
+        shipInfo.Text = "Claim your ticket at the cabin!"
+    end
+    --Check if this is the final pirate ship piece or the ticket cabin
+    if building.Name == "Ship_Air_Balloon" or building.Name == "Ticket_Cabin" then
+        --Display ship info UI
+        shipInfoTweenIn:Play()
+        QuickSound(swishSoundIn)
+        task.wait(6)
+        --Hide ship info UI
+        shipInfoTweenOut:Play()
+        QuickSound(swishSoundOut)
+    end
 end
 
 --Connect to animate new buildings
 buildings.ChildAdded:Connect(animateBuilding)
 
--------------------// FLOATING DEBRIS \\-------------------
+-------------------// TICKET CLAIMED \\-------------------
+
+--Play ticket claimed animation
+ticketRemote.OnClientEvent:Connect(function()
+    --Play sound and tween in
+    QuickSound(ticketClaimedSound)
+    ticketTweenIn:Play()
+    --Display for 7 seconds
+    task.wait(7)
+    --Play sound and tween out
+    QuickSound(swishSoundOut)
+    ticketTweenOut:Play()
+end)
