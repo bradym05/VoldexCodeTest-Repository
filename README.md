@@ -277,6 +277,8 @@ ShipClass:<br />
 -Automatically resets ship to its original location when dismounted within a set range.<br />
 -Calculates average velocity from given amount of checks at a given rate.<br />
 -Resets ship and character if given maximum warnings are exceeded.<br />
+-Clears velocities and anchors all parts when ship is not being driven.<br />
+-Restricts ship rotation to single axis via align orientation.<br />
 
 ShipReplicator:<br />
 

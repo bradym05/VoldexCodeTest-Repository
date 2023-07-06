@@ -19,8 +19,8 @@ local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
 local dismountRemote : RemoteEvent = remotes:WaitForChild("Dismount")
 
 --Settings
-local MAX_FORCE = 14000000 --Maximum movement force, higher values result in higher responsiveness
-local MAX_TORQUE = 800000000 --Maximum turn force
+local MAX_FORCE = 1000000 --Maximum movement force, higher values result in higher responsiveness
+local MAX_TORQUE = 80000000 --Maximum turn force
 local PARK_DISTANCE = 100 --Maximum distance in feet where ship is returned to tycoon when dismounted
 local SHIP_SPEED = 25 --Speed in studs per second
 local TURN_SPEED = 1 --Turning speed in studs per second
@@ -62,18 +62,26 @@ end
 
 --Weld descendants of an instance to given root part
 local function weldAll(group : Instance, root : BasePart)
+    --Initalize table of newly welded parts
+    local newWelds = {}
     --Iterate over all descendants of given group
     for _, descendant in pairs(group:GetDescendants()) do
         --Typecheck to make sure descendant can be welded. Check that descendant is not root.
         if (descendant:IsA("BasePart") or descendant:IsA("MeshPart")) and descendant ~= root then
             --Attempt to weld descendant to root
-            local weldSuccess = weldParts(descendant, root)
+            local weldSuccess, created = weldParts(descendant, root)
             --Unanchor descendant if welded
             if weldSuccess then
                 descendant.Anchored = false
             end
+            --Add to table of new welds if created is returned
+            if created then
+                table.insert(newWelds, descendant)
+            end
         end
     end
+    --Return newWelds
+    return newWelds
 end
 
 --Create actuators for ships with predetermined properties
@@ -81,6 +89,19 @@ local function CreateActuators(rootPart : Part) : LinearVelocity & AngularVeloci
     --Create and parent attachment for actuators
     local centralAttachment = Instance.new("Attachment")
     centralAttachment.Parent = rootPart
+    --Create and parent orientation attachment for align orientation
+    local orientationAttachment = Instance.new("Attachment")
+    orientationAttachment.Parent = rootPart
+    orientationAttachment.CFrame = CFrame.Angles(0, 0, math.rad(90))
+    --Create align orientation to only allow movement around yaw axis
+    local alignOrientation : AlignOrientation = Instance.new("AlignOrientation")
+    alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    alignOrientation.AlignType = Enum.AlignType.Parallel
+    alignOrientation.PrimaryAxisOnly = true
+    alignOrientation.RigidityEnabled = true
+    alignOrientation.PrimaryAxis = Vector3.new(0, 1, 0)
+    alignOrientation.Attachment0 = orientationAttachment
+    alignOrientation.Parent = rootPart
     --Create plane constraint to restrict movement
     local planeConstraint : PlaneConstraint = Instance.new("PlaneConstraint")
     planeConstraint.Attachment0 = planeAttachment
@@ -193,8 +214,8 @@ function Ship.new(player : Player, shipPieces : table)
     self.shipModel.PrimaryPart = self.rootPart
     --Add created instances to table of instances for clean up
     table.insert(self.instances, self.shipModel)
-    --Weld ship pieces to root part
-    weldAll(self.shipModel, self.rootPart)
+    --Weld ship pieces to root part and get new welds
+    self.newWelds = weldAll(self.shipModel, self.rootPart)
     --Create and store actuators
     self.linearVelocity, self.angularVelocity = CreateActuators(self.rootPart)
     --Get all effects to activate on move
@@ -265,12 +286,6 @@ function Ship:SetupPrompt()
     end
 end
 
---Update loaded character to respect ship state
-function Ship:CharacterLoaded()
-    --Reset ship and dismount
-    self:Reset(true)
-end
-
 --Set current character (MUST BE CALLED EXTERNALLY)
 function Ship:SetCharacter(character : Model)
     --Clear references from previous character
@@ -278,7 +293,7 @@ function Ship:SetCharacter(character : Model)
     --Update character variable
     self.character = character
     --Update character loaded variable
-    self.characterLoaded = character ~= nil
+    self.characterLoaded = character:FindFirstChild("HumanoidRootPart") ~= nil
     --Update humanoid
     self.humanoid = character:FindFirstChild("Humanoid")
     --Disconnect from character child added if connected
@@ -299,8 +314,13 @@ function Ship:SetCharacter(character : Model)
             if self.characterLoaded and self.humanoid then
                 self.childAddedConnection:Disconnect()
                 self.childAddedConnection = nil
+                --Reset ship and dismount
+                self:Reset(true)
             end
         end)
+    else
+        --Reset ship and dismount
+        self:Reset(true)
     end
 end
 
@@ -322,6 +342,10 @@ function Ship:ToggleMount(toggle : boolean?)
             local _, mountWeld = weldParts(self.character.PrimaryPart, self.mountPart)
             self.mountWeld = mountWeld
         end
+        --Unanchor all ship parts
+        for _, shipPart : BasePart in pairs(self.newWelds) do
+            shipPart.Anchored = false
+        end
         --Check if ship has already been mounted
         if self.mounted ~= toggle then
             --Give control to the player
@@ -342,6 +366,12 @@ function Ship:ToggleMount(toggle : boolean?)
             --Pivot player with since ship has reset
             self.character:PivotTo(self.mountPart.CFrame + Vector3.new(0, 5, 0))
         end
+        --Anchor all ship parts and clear velocities
+        for _, shipPart : BasePart in pairs(self.newWelds) do
+            shipPart.Anchored = true
+            shipPart.AssemblyAngularVelocity = Vector3.new()
+            shipPart.AssemblyLinearVelocity = Vector3.new()
+        end
     end
     --Set mounted to given toggle
     self.mounted = toggle
@@ -351,24 +381,15 @@ end
 
 --Reset ship
 function Ship:Reset(dismount : boolean?)
-    --Anchor root part to prevent movement
-    self.rootPart.Anchored = true
-    --Pivot ship to origin
-    self.shipModel:PivotTo(self.baseCFrame)
     --Check if ship should also dismount
     if dismount then
         --Dismount
         self:ToggleMount(false)
     end
-    --Clear assembly velocity
-    for _, part : BasePart in pairs(self.shipModel:GetDescendants()) do
-        --Check if part has velocity property
-        if part:IsA("BasePart") or part:IsA("MeshPart") then
-            --Clear velocities
-            part.AssemblyAngularVelocity = Vector3.new()
-            part.AssemblyLinearVelocity = Vector3.new()
-        end
-    end
+    --Anchor root part to prevent movement
+    self.rootPart.Anchored = true
+    --Pivot ship to origin
+    self.shipModel:PivotTo(self.baseCFrame)
 end
 
 --Toggle all visual effects
@@ -404,6 +425,8 @@ function Ship:AddWarning()
         self.warnings = 0
         --Increment reset cycle
         self.resetCycle += 1
+        --Reset ship
+        self:Reset(true)
         --Reload player's character
         self.player:LoadCharacter()
     else

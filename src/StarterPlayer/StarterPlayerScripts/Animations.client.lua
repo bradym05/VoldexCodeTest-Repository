@@ -10,6 +10,7 @@ local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
 local QuickTween = require(ReplicatedStorage:WaitForChild("QuickTween"))
 local TweenAny = require(ReplicatedStorage:WaitForChild("TweenAny"))
 local ParticleHandler = require(ReplicatedStorage:WaitForChild("ParticleHandler"))
+local GUI = require(ReplicatedStorage:WaitForChild("GUI"))
 
 --Instances
 local player : Player = Players.LocalPlayer
@@ -35,7 +36,7 @@ local buildAnimationsSetting : BoolValue = settingsFolder:WaitForChild("BuildAni
 local playerGui : PlayerGui = player:WaitForChild("PlayerGui")
 local mainInterface : ScreenGui = playerGui:WaitForChild("MainInterface")
 local shipInfo : TextLabel = mainInterface:WaitForChild("ShipInfo")
-local ticket : ImageLabel = mainInterface:WaitForChild("Ticket")
+local ticketImage : ImageButton = mainInterface:WaitForChild("Ticket")
 
 --Settings
 local BUTTON_SOUND = sounds:WaitForChild("ButtonPress") -- Sound played upon stepping on a pad
@@ -59,14 +60,15 @@ local shipInfoTweenIn = TweenService:Create(shipInfo, shipInfoTF, {Position = UD
 local shipInfoTweenOut = TweenService:Create(shipInfo, shipInfoTF, {Position = UDim2.new(0.5, 0, -0.5, 0)})
 
 local ticketTF = TweenInfo.new(1, Enum.EasingStyle.Back, Enum.EasingDirection.InOut)
-local ticketTweenIn = TweenService:Create(ticket, ticketTF, {Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0.292, 0, 0.359, 0), Rotation = 0})
-local ticketTweenOut = TweenService:Create(ticket, ticketTF, {Position = UDim2.new(0.5, 0, 1.5, 0), Size = UDim2.new(0.195, 0, 0.239, 0), Rotation = 45})
+local ticketTweenIn = TweenService:Create(ticketImage, ticketTF, {Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0.292, 0, 0.359, 0), Rotation = 0})
+local ticketTweenOut = TweenService:Create(ticketImage, ticketTF, {Position = UDim2.new(0.5, 0, 1.5, 0), Size = UDim2.new(0.195, 0, 0.239, 0), Rotation = 45})
 
 --Particles
 local coinExplosion = ParticleHandler.new(particles:WaitForChild("CoinExplosion"))
 
 --Manipulated
 local cache = {}
+local ticketButton
 
 ---------------------// PRIVATE CODE \\--------------------
 
@@ -233,14 +235,30 @@ buildings.ChildAdded:Connect(animateBuilding)
 
 -------------------// TICKET CLAIMED \\-------------------
 
---Play ticket claimed animation
-ticketRemote.OnClientEvent:Connect(function()
+local function hideTicket()
+    --Check if ticket is active
+    if ticketButton then
+        --Play sound and tween out
+        QuickSound(swishSoundOut)
+        ticketTweenOut:Play()
+        --Destroy button object
+        ticketButton:Destroy()
+        ticketButton = nil
+    end
+end
+
+--Plays ticket animation
+local function onTicketClaimed()
     --Play sound and tween in
     QuickSound(ticketClaimedSound)
     ticketTweenIn:Play()
+    --Create button
+    ticketButton = GUI.Button(ticketImage, hideTicket)
     --Display for 7 seconds
     task.wait(7)
-    --Play sound and tween out
-    QuickSound(swishSoundOut)
-    ticketTweenOut:Play()
-end)
+    --Hide ticket automatically
+    hideTicket()
+end
+
+--Play ticket claimed animation
+ticketRemote.OnClientEvent:Connect(onTicketClaimed)
