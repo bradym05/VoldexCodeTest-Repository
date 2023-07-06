@@ -9,17 +9,26 @@ This module is a subclass of ShipReplicator which performs additional setup and 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
 --Modules
 local ShipReplicator = require(ReplicatedStorage:WaitForChild("ShipReplicator"))
+local UserInputService = game:GetService("UserInputService")
 
 --Instances
-local player : Player = game.Players.LocalPlayer
+local player : Player = Players.LocalPlayer
+local playerGui : PlayerGui = player:WaitForChild("PlayerGui")
+local mainInterface : ScreenGui = playerGui:WaitForChild("MainInterface")
+local dismountInfo : TextLabel = mainInterface:WaitForChild("DismountInfo")
+
 local steerAnimationsFolder : Folder = ReplicatedStorage:WaitForChild("SteerAnimations")
 local steerIdle : Animation = steerAnimationsFolder:WaitForChild("SteerIdle")
 local steerRight : Animation = steerAnimationsFolder:WaitForChild("SteerRight")
 local steerLeft : Animation = steerAnimationsFolder:WaitForChild("SteerLeft")
 local steerAnimations : table = steerAnimationsFolder:GetChildren()
+
+local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
+local dismountRemote : RemoteEvent = remotes:WaitForChild("Dismount")
 
 --Settings
 local STEER_INPUTS = { --Inputs which can steer the ship
@@ -39,7 +48,11 @@ local DIRECTION_MAP = { --Map of keycode names to directions (-1 = left | 0 = fo
     A = -1,
     D = 1,
 }
-local SHIP_SPEED = 25
+
+--Tween settings
+local dismountInfoTF = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.InOut)
+local dismountInfoTweenIn = TweenService:Create(dismountInfo, dismountInfoTF, {Position = UDim2.new(0.5, 0, 0.05, 0)})
+local dismountInfoTweenOut = TweenService:Create(dismountInfo, dismountInfoTF, {Position = UDim2.new(0.5, 0, -0.5, 0)})
 
 --Manipulated
 local shipIndex = 0
@@ -64,14 +77,6 @@ local function handleSteering(actionName : string, inputState: Enum.UserInputSta
     end
 end
 
---Clears a dictionary
-local function clearDictionary(dict : table)
-    --Set all keys to nil
-    for key, _ in pairs(dict) do
-        dict[key] = nil
-    end
-end
-
 ----------------// PLAYER SHIP CLASS \\----------------------
 
 local PlayerShip = {}
@@ -90,6 +95,12 @@ function PlayerShip.new(shipModel : Model)
     --Initialize active directions and direction variable
     self.activeDirections = 0
     self.directionTotal = 0
+    --Initialize table of Motor6Ds to activate when moving
+    self.movementMotors = {}
+    self.motorsActive = false
+    --Get turn and move speed from ship model
+    self.moveSpeed = shipModel:GetAttribute("SHIP_SPEED")
+    self.turnSpeed = shipModel:GetAttribute("TURN_SPEED")
     setmetatable(self, PlayerShip)
 
     --// INITIAL SETUP CODE \\--
@@ -103,7 +114,15 @@ function PlayerShip.new(shipModel : Model)
     self.shipId = tostring(shipIndex)
     --Create reference
     idToShip[self.shipId] = self
-    --Listen to ship mount and dismount
+    --Iterate over all descendants
+    for _, descendant : Instance in pairs(shipModel:GetDescendants()) do
+        --Check what type of instance this is and reference accordingly
+        if descendant:IsA("Motor6D") and descendant:GetAttribute("MoveVelocity")  then
+            --Reference motor to velocity
+            self.movementMotors[descendant] = descendant:GetAttribute("MoveVelocity")
+        end
+    end
+    --Listen to ship mount/dismount
     local mountAttributeChanged
     mountAttributeChanged = shipModel:GetAttributeChangedSignal("Mounted"):Connect(function()
         --Call ToggleMount method
@@ -111,14 +130,22 @@ function PlayerShip.new(shipModel : Model)
     end)
     --Setup first character
     self:CharacterAdded(player.Character or player.CharacterAdded:Wait())
-    --Listen to character added and setup
+    --Listen to character added
     local characterAddedConnection
     characterAddedConnection = player.CharacterAdded:Connect(function(character)
+        --Call character added method
         self:CharacterAdded(character)
+    end)
+    --Listen to jump request
+    local jumpRequestConnection
+    jumpRequestConnection = UserInputService.JumpRequest:Connect(function()
+        --Call request dismount method
+        self:RequestDismount()
     end)
     --Add connections to table of connections for GC
     table.insert(self.connections, mountAttributeChanged)
     table.insert(self.connections, characterAddedConnection)
+    table.insert(self.connections, jumpRequestConnection)
     return self
 end
 
@@ -127,7 +154,9 @@ function PlayerShip._destroy(self)
     --Clear reference
     idToShip[self.shipId] = nil
     --Clear animation dictionary
-    clearDictionary(self.animations)
+    self:_clearDictionary(self.animations)
+    --Clear motor dictionary
+    self:_clearDictionary(self.movementMotors)
     --Unbind steering action
     self:BindSteer(false)
     --Disconnect child added connection if connected
@@ -149,7 +178,7 @@ function PlayerShip:CharacterAdded(character : Model)
         self.childAddedConnection = nil
     end
     --Clear animation tracks
-    clearDictionary(self.animations)
+    self:_clearDictionary(self.animations)
     --Update character reference
     self.character = character
     --Update humanoid reference
@@ -165,21 +194,35 @@ function PlayerShip:CharacterAdded(character : Model)
                 self.childAddedConnection:Disconnect()
                 self.childAddedConnection = nil
                 --Load animations
-                self:LoadAnimations()
+                self:LoadAnimations(self.humanoid:WaitForChild("Animator"))
             end
         end)
     else
         --Load animations
-        self:LoadAnimations()
+        self:LoadAnimations(self.humanoid:WaitForChild("Animator"))
     end
 end
 
---Loads animations onto current humanoid and references tracks in dictionary
-function PlayerShip:LoadAnimations()
+--Loads animations onto given animator and references tracks in dictionary
+function PlayerShip:LoadAnimations(animator : Animator)
     --Iterate over all steering animations
     for _, animation : Animation in pairs(steerAnimations) do
         --Create reference from object to track
-        self.animations[animation] = self.humanoid.Animator:LoadAnimation(animation)
+        self.animations[animation] = animator:LoadAnimation(animation)
+    end
+end
+
+--Method to enable or disable Motor6D animations
+function PlayerShip:ToggleMotors(toggle : boolean?)
+    --Make sure the requested toggle is not the current toggle
+    if toggle ~= self.motorsActive then
+        --Set motors active
+        self.motorsActive = toggle
+        --Loop through all motor-moveSpeed pairs
+        for motor : Motor6D, moveSpeed in pairs(self.movementMotors) do
+            --Set speed to given speed or set to 0 if toggle is false
+            motor.MaxVelocity = (toggle and moveSpeed) or 0
+        end
     end
 end
 
@@ -205,13 +248,15 @@ function PlayerShip:Steer(inputState : Enum.UserInputState, inputObject : InputO
     --Check if moving
     if self.activeDirections > 0 then
         --Move forward at set ship speed
-        self.linearVelocity.VectorVelocity = Vector3.new(0, 0, SHIP_SPEED)
+        self.linearVelocity.VectorVelocity = Vector3.new(0, 0, self.moveSpeed)
+        --Enable motor animations
+        self:ToggleMotors(true)
         --Check if turning
         if math.abs(self.directionTotal) > 0 then
             --Get direction average
             local directionAverage = self.directionTotal/self.activeDirections
             --Set angular velocity and wheel angle to rotate based on move direction
-            self.angularVelocity.AngularVelocity = Vector3.new(0, -directionAverage * SHIP_SPEED, 0)
+            self.angularVelocity.AngularVelocity = Vector3.new(0, -directionAverage * self.turnSpeed, 0)
             self.turnMotor.DesiredAngle = -directionAverage/2
             --Get turn animation from sign
             local turnAnimation = (self.directionTotal > 0 and steerRight) or (self.directionTotal < 0 and steerLeft)
@@ -240,6 +285,8 @@ function PlayerShip:Steer(inputState : Enum.UserInputState, inputObject : InputO
         --Set velocity to 0
         self.linearVelocity.VectorVelocity = Vector3.new()
         self.angularVelocity.AngularVelocity = Vector3.new()
+        --Disable motor animations
+        self:ToggleMotors(false)
     end
 end
 
@@ -266,6 +313,10 @@ function PlayerShip:ToggleMount(toggle : boolean?)
         if idleTrack and not idleTrack.IsPlaying then
             idleTrack:Play()
         end
+        --Update states
+        self.humanoid.PlatformStand = true
+        --Tween in dismount info
+        dismountInfoTweenIn:Play()
     else
         --Iterate over all loaded tracks
         for _, track : AnimationTrack in pairs(self.animations) do
@@ -274,6 +325,21 @@ function PlayerShip:ToggleMount(toggle : boolean?)
         end
         --Remove reference to current turn
         self.currentTurn = nil
+        --Update states
+        self.humanoid.PlatformStand = false
+        --Disable motor animations
+        self:ToggleMotors(false)
+        --Tween out dismount info
+        dismountInfoTweenOut:Play()
+    end
+end
+
+--Method to request that the server dismounts the player
+function PlayerShip:RequestDismount()
+    --Check if ship is mounted
+    if self.shipModel:GetAttribute("Mounted") == true then
+        --Request dismount
+        dismountRemote:FireServer()
     end
 end
 

@@ -267,11 +267,20 @@ ShipClass:<br />
 -Connects to mount requests from client and validates that requested value is not the set value.<br />
 -Grants player network ownership of the ship for movement when mounted.<br />
 -Revokes network ownership by anchoring the ship when dismounted.<br />
+-Dismounts players on request via remote event.<br />
+-Automatically resets ship to its original location when dismounted within a set range.<br />
+-Calculates average velocity from given amount of checks at a given rate.<br />
+-Resets ship and character if given maximum warnings are exceeded.<br />
 
 ShipReplicator:<br />
 
 -Disables proximity prompt.<br />
--Gets velocities, Motor6Ds, and trails for animation.<br />
+-Gets velocity actuators, and Motor6Ds.<br />
+-Contains a table of tasks to be called on the Destroy method for subclasses.<br />
+-Contains the private _clearDictionary method to clean up dictionaries.<br />
+-Gets all particles from the ship.<br />
+-Adjusts rate of particles when they are enabled based on player's particle setting.<br />
+-Fades in lights and sound effect volume when they are played or enabled.<br />
 
 PlayerShip:<br />
 
@@ -282,6 +291,8 @@ PlayerShip:<br />
 -Applies movement direction to ship's linear and angular velocity on change.<br />
 -Plays and changes steering animations depending on movement direction.<br />
 -Turns ship wheel to move with animations.<br />
+-Listens to player jump requests from UserInputService and requests dismount.<br />
+-Tweens gui in and out informing player on how to stop flying the ship.<br />
 
 ShipsClient:<br />
 

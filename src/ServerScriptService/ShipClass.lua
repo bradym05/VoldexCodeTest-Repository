@@ -8,20 +8,34 @@ This module initializes an OOP ship class. The ship class is responsible for con
 --Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 --Instances
 local shipFolder : Folder = workspace:WaitForChild("Ships")
-local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
-
 local planePart : Part = workspace:WaitForChild("ShipPlane")
 local planeAttachment : Attachment = planePart:WaitForChild("Plane")
 
+local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
+local dismountRemote : RemoteEvent = remotes:WaitForChild("Dismount")
+
 --Settings
-local MAX_FORCE = 14000000 --Maximum acceleration force, higher values result in higher responsiveness
-local SHIP_SPEED = 25 --Speed in studs per second of ships
+local MAX_FORCE = 14000000 --Maximum movement force, higher values result in higher responsiveness
+local MAX_TORQUE = 800000000 --Maximum turn force
+local PARK_DISTANCE = 100 --Maximum distance in feet where ship is returned to tycoon when dismounted
+local SHIP_SPEED = 25 --Speed in studs per second
+local TURN_SPEED = 1 --Turning speed in studs per second
+local EFFECT_VELOCITY = 8 --Velocity where visual effects are enabled or disabled
+
+local VELOCITY_CHECKS = 3 --Required checks to calculate average velocity
+local VELOCITY_CUSHION = 1.25 --Multiplied by SHIP_SPEED to determine maximum allowed velocity
+local CHECK_RATE = 10 --How often checks are performed
+local MAX_WARNINGS = 25 --Maximum warnings before ship is reset
+local WARNING_EXPIRATION = 40 --How long each warning lasts
 
 --Manipulated
 local playerToShip = {}
+local checkTime = 1/CHECK_RATE
+local checkElapsed = 0
 
 ------------------// PRIVATE FUNCTIONS \\------------------
 
@@ -30,16 +44,17 @@ local function weldParts(part : BasePart, weldTo : BasePart) : boolean
     --Make sure parts are not destroyed, parts are not the same, and both are BaseParts before continuing (https://create.roblox.com/docs/reference/engine/classes/WeldConstraint)
     if part and part.Parent and weldTo and weldTo.Parent and part ~= weldTo and (part:IsA("BasePart") or part:IsA("MeshPart")) and (weldTo:IsA("BasePart") or weldTo:IsA("MeshPart")) then
         --Also check if a weld constraint or motor already, because some ship parts have WeldConstraints and Motor6Ds
+        local weldConstraint
         if not part:FindFirstChildOfClass("Motor6D") and not part:FindFirstChildOfClass("WeldConstraint") then
             --Create weld constraint between both parts
-            local weldConstraint = Instance.new("WeldConstraint")
+            weldConstraint = Instance.new("WeldConstraint")
             weldConstraint.Part0 = weldTo
             weldConstraint.Part1 = part
             --Parent to the part being welded
             weldConstraint.Parent = part
         end
-        --Return success
-        return true
+        --Return success and created constraint
+        return true, weldConstraint
     end
     --Return false by default
     return false
@@ -82,7 +97,7 @@ local function CreateActuators(rootPart : Part) : LinearVelocity & AngularVeloci
     --Create and parent angular velocity actuator
     local angularVelocity : AngularVelocity = Instance.new("AngularVelocity")
     angularVelocity.Attachment0 = centralAttachment
-    angularVelocity.MaxTorque = MAX_FORCE * 100
+    angularVelocity.MaxTorque = MAX_TORQUE
     angularVelocity.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
     angularVelocity.Parent = rootPart
     --Only return linear and angular velocity (attachment and plane constraint are constant)
@@ -112,6 +127,17 @@ local function onPlayerRemoving(player : Player)
     end
 end
 
+--Handle requests to dismount ship
+local function onDismountEvent(player : Player)
+    --Get ship object
+    local shipObject = playerToShip[player]
+    --Check if ship exists and is mounted
+    if shipObject and shipObject.mounted == true then
+        --Call method for dismount
+        shipObject:ToggleMount(false)
+    end
+end
+
 ---------------------// SHIP CLASS \\----------------------
 
 local Ship = {}
@@ -129,12 +155,25 @@ function Ship.new(player : Player, shipPieces : table)
     self.shipModel = Instance.new("Model")
     --Initialize table of connections for GC in Destroy method
     self.connections = {}
+    --Initialize table of effects to activate on move and boolean to indicate if they are enabled
+    self.moveEffects = {}
+    self.effectsEnabled = false
+    --Initialize total velocity and completed checks variable to calculate average velocity
+    self.velocityTotal = 0
+    self.checksCompleted = 0
+    --Initialize warnings and reset cycle variable to measure suspicious activity
+    self.warnings = 0
+    self.resetCycle = 0
+    --Initialize table of effects to activate on move
+
     setmetatable(self, Ship)
 
     --// INITIAL SETUP CODE \\--
 
-    --Name and parent ship model
+    --Setup and parent ship model
     self.shipModel.Name = tostring(player.UserId)
+    self.shipModel:SetAttribute("SHIP_SPEED", SHIP_SPEED)
+    self.shipModel:SetAttribute("TURN_SPEED", TURN_SPEED)
     self.shipModel.Parent = shipFolder
     --Initialize "Mounted" attribute
     self.shipModel:SetAttribute("Mounted", false)
@@ -158,6 +197,13 @@ function Ship.new(player : Player, shipPieces : table)
     weldAll(self.shipModel, self.rootPart)
     --Create and store actuators
     self.linearVelocity, self.angularVelocity = CreateActuators(self.rootPart)
+    --Get all effects to activate on move
+    for _, descendant : Instance in pairs(self.shipModel:GetDescendants()) do
+        --Check if descendant is effect
+        if descendant:GetAttribute("onMove") and descendant:IsA("ParticleEmitter") or descendant:IsA("Light") or descendant:IsA("Sound") then
+            table.insert(self.moveEffects, descendant)
+        end
+    end
     --Setup proximity prompt
     self:SetupPrompt()
     --Create reference
@@ -221,8 +267,8 @@ end
 
 --Update loaded character to respect ship state
 function Ship:CharacterLoaded()
-    --Mount new character if previously mounted
-    self:ToggleMount(self.mounted)
+    --Reset ship and dismount
+    self:Reset(true)
 end
 
 --Set current character (MUST BE CALLED EXTERNALLY)
@@ -272,7 +318,9 @@ function Ship:ToggleMount(toggle : boolean?)
             local yIncrement : number = self.humanoid.HipHeight + self.character.PrimaryPart.Size.Y/2
             --Pivot to mount CFrame + half of characters height to line up player with ground
             self.character:PivotTo(self.mountPart.CFrame + Vector3.new(0, yIncrement, 0))
-            weldParts(self.character.PrimaryPart, self.mountPart) 
+            --Weld character to ship and set mountWeld
+            local _, mountWeld = weldParts(self.character.PrimaryPart, self.mountPart)
+            self.mountWeld = mountWeld
         end
         --Check if ship has already been mounted
         if self.mounted ~= toggle then
@@ -287,6 +335,13 @@ function Ship:ToggleMount(toggle : boolean?)
         end
         --Enable prompt
         self.prompt.Enabled = true
+        --Check proximity to tycoon
+        if (self.rootPart.Position - self.baseCFrame.Position).Magnitude <= PARK_DISTANCE then
+            --Reset ship since it is within parking distance
+            self:Reset(false)
+            --Pivot player with since ship has reset
+            self.character:PivotTo(self.mountPart.CFrame + Vector3.new(0, 5, 0))
+        end
     end
     --Set mounted to given toggle
     self.mounted = toggle
@@ -295,18 +350,133 @@ function Ship:ToggleMount(toggle : boolean?)
 end
 
 --Reset ship
-function Ship:Reset()
-    --Dismount
-    self:ToggleMount(false)
+function Ship:Reset(dismount : boolean?)
     --Anchor root part to prevent movement
     self.rootPart.Anchored = true
     --Pivot ship to origin
     self.shipModel:PivotTo(self.baseCFrame)
+    --Check if ship should also dismount
+    if dismount then
+        --Dismount
+        self:ToggleMount(false)
+    end
+    --Clear assembly velocity
+    for _, part : BasePart in pairs(self.shipModel:GetDescendants()) do
+        --Check if part has velocity property
+        if part:IsA("BasePart") or part:IsA("MeshPart") then
+            --Clear velocities
+            part.AssemblyAngularVelocity = Vector3.new()
+            part.AssemblyLinearVelocity = Vector3.new()
+        end
+    end
+end
+
+--Toggle all visual effects
+function Ship:ToggleEffects(toggle : boolean?)
+    --Check that requested toggle is different from current toggle
+    if toggle ~= self.effectsEnabled then
+        --Set effects enabled to toggle
+        self.effectsEnabled = toggle
+        --Iterate through all effects
+        for _, effect : ParticleEmitter | Light | Sound in pairs(self.moveEffects) do
+            --Toggle by class
+            if effect:IsA("ParticleEmitter") or effect:IsA("Light") then
+                effect.Enabled = toggle
+            elseif effect:IsA("Sound") then
+                --Stop or play based on toggle
+                if toggle == true then
+                    effect:Play()
+                else
+                    effect:Stop()
+                end
+            end
+        end
+    end
+end
+
+--Adds a warning and determines if ship should be reset
+function Ship:AddWarning()
+    --Increment warnings
+    self.warnings += 1
+    --Check if max warnings is reached
+    if self.warnings >= MAX_WARNINGS then
+        --Reset warnings
+        self.warnings = 0
+        --Increment reset cycle
+        self.resetCycle += 1
+        --Reload player's character
+        self.player:LoadCharacter()
+    else
+        --Store current reset cycle
+        local currentCycle = self.resetCycle
+        --Wait for set time
+        task.delay(WARNING_EXPIRATION, function()
+            --Remove warning if the cycle has not reset and ship is active
+            if self and not table.isfrozen(self) and self.resetCycle == currentCycle then
+                self.warnings -= 1
+            end
+        end)
+    end
+end
+
+--Get velocity with change in time
+function Ship:GetVelocity(deltaTime : number)
+    --Check if last position is initialized
+    if self.lastPosition then
+        --Get change in distance
+        local deltaDistance = (self.rootPart.Position - self.lastPosition).Magnitude
+        --Calculate velocity and increment total
+        self.velocityTotal += deltaDistance/deltaTime
+        --Increment completed checks
+        self.checksCompleted += 1
+        --See if required checks have been completed
+        if self.checksCompleted >= VELOCITY_CHECKS then
+            --Calculate average velocity
+            local averageVelocity = self.velocityTotal/self.checksCompleted
+            --Reset variables
+            self.velocityTotal = 0
+            self.checksCompleted = 0
+            --Check if calculated velocity is greater than maximum
+            if averageVelocity > SHIP_SPEED * VELOCITY_CUSHION then
+                self:AddWarning()
+            end
+            --Enable effects if they meet the EFFECT_VELOCITY setting, or disable
+            self:ToggleEffects(averageVelocity >= EFFECT_VELOCITY)
+        end
+    end
+    --Set last position to current position
+    self.lastPosition = self.rootPart.Position
 end
 
 ---------------------// PRIVATE CODE \\--------------------
 
 --Connect to player removing
 Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+--Connect to dismount requested
+dismountRemote.OnServerEvent:Connect(onDismountEvent)
+
+--Core heartbeat connection to calculate velocity
+RunService.Heartbeat:Connect(function(deltaTime)
+    --Increment time since last check
+    checkElapsed += deltaTime
+    --Check if enough time has passed to match set rate
+    if checkElapsed >= checkTime then
+        --Store elapsed time locally and reset
+        local lastElapsed = checkElapsed
+        checkElapsed = 0
+        --Iterate over all ships
+        for player : Player, shipObject in pairs(playerToShip) do
+            --Make sure ship is active
+            if shipObject and not table.isfrozen(shipObject) then
+                --Call GetVelocity method with stored lastElapsed
+                shipObject:GetVelocity(lastElapsed)
+            else
+                --Ship is inactive, remove reference
+                playerToShip[player] = nil
+            end
+        end
+    end
+end)
 
 return Ship
