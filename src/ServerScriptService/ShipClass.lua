@@ -20,7 +20,7 @@ local dismountRemote : RemoteEvent = remotes:WaitForChild("Dismount")
 
 --Settings
 local MAX_FORCE = 14000000 --Maximum movement force, higher values result in higher responsiveness
-local MAX_TORQUE = 800000000 --Maximum turn force
+local MAX_TORQUE = 2000000000 --Maximum turn force
 local PARK_DISTANCE = 100 --Maximum distance in feet where ship is returned to tycoon when dismounted
 local SHIP_SPEED = 25 --Speed in studs per second
 local TURN_SPEED = 1 --Turning speed in studs per second
