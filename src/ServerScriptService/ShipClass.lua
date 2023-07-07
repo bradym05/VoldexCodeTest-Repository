@@ -21,7 +21,7 @@ local dismountRemote : RemoteEvent = remotes:WaitForChild("Dismount")
 --Settings
 local MAX_FORCE = 1000000 --Maximum movement force, higher values result in higher responsiveness
 local MAX_TORQUE = 80000000 --Maximum turn force
-local PARK_DISTANCE = 100 --Maximum distance in feet where ship is returned to tycoon when dismounted
+local PARK_DISTANCE = 100 --Maximum distance in studs where ship is returned to tycoon when dismounted
 local SHIP_SPEED = 25 --Speed in studs per second
 local TURN_SPEED = 1 --Turning speed in studs per second
 local EFFECT_VELOCITY = 8 --Velocity where visual effects are enabled or disabled
@@ -307,20 +307,20 @@ function Ship:SetCharacter(character : Model)
             --Update variables depending on what was added
             if child:IsA("Humanoid") then
                 self.humanoid = child
-            elseif self.character.PrimaryPart ~= nil then
+            elseif child.Name == "HumanoidRootPart" then
                 self.characterLoaded = true
             end
             --Check if connection is still needed, disconnect and clear reference if not
             if self.characterLoaded and self.humanoid then
                 self.childAddedConnection:Disconnect()
                 self.childAddedConnection = nil
-                --Reset ship and dismount
-                self:Reset(true)
+                --Reset ship
+                self:Reset()
             end
         end)
     else
-        --Reset ship and dismount
-        self:Reset(true)
+        --Reset ship
+        self:Reset()
     end
 end
 
@@ -329,7 +329,7 @@ function Ship:ToggleMount(toggle : boolean?)
     --Make ship moveable or anchored
     self.rootPart.Anchored = not toggle
     --Mount player if toggled true
-    if toggle then
+    if toggle == true then
         --Disable prompt while mounted
         self.prompt.Enabled = false
         --Move character to mount part and weld if character has loaded
@@ -357,21 +357,21 @@ function Ship:ToggleMount(toggle : boolean?)
             self.mountWeld:Destroy()
             self.mountWeld = nil
         end
-        --Enable prompt
-        self.prompt.Enabled = true
-        --Check proximity to tycoon
-        if (self.rootPart.Position - self.baseCFrame.Position).Magnitude <= PARK_DISTANCE then
-            --Reset ship since it is within parking distance
-            self:Reset(false)
-            --Pivot player with since ship has reset
-            self.character:PivotTo(self.mountPart.CFrame + Vector3.new(0, 5, 0))
-        end
         --Anchor all ship parts and clear velocities
         for _, shipPart : BasePart in pairs(self.newWelds) do
             shipPart.Anchored = true
             shipPart.AssemblyAngularVelocity = Vector3.new()
             shipPart.AssemblyLinearVelocity = Vector3.new()
         end
+        --Check proximity to tycoon
+        if (self.rootPart.Position - self.baseCFrame.Position).Magnitude <= PARK_DISTANCE then
+            --Reset ship since it is within parking distance
+            self:Reset()
+            --Pivot player with ship since ship has moved
+            self.character:PivotTo(self.mountPart.CFrame + Vector3.new(0, 5, 0))
+        end
+        --Enable prompt
+        self.prompt.Enabled = true
     end
     --Set mounted to given toggle
     self.mounted = toggle
@@ -379,17 +379,24 @@ function Ship:ToggleMount(toggle : boolean?)
     self.shipModel:SetAttribute("Mounted", self.mounted)
 end
 
---Reset ship
-function Ship:Reset(dismount : boolean?)
-    --Check if ship should also dismount
-    if dismount then
-        --Dismount
-        self:ToggleMount(false)
-    end
-    --Anchor root part to prevent movement
-    self.rootPart.Anchored = true
+--Reset ship to start position
+function Ship:Reset()
     --Pivot ship to origin
     self.shipModel:PivotTo(self.baseCFrame)
+    --Reset warnings to prevent detecting pivot as a warning
+    self:ResetWarnings()
+end
+
+--Resets warning cycle and velocities
+function Ship:ResetWarnings()
+    self.warnings = 0
+    --Increment reset cycle
+    self.resetCycle += 1
+    --Clear last position
+    self.lastPosition = nil
+    --Clear velocity total and checks completed
+    self.velocityTotal = 0
+    self.checksCompleted = 0
 end
 
 --Toggle all visual effects
@@ -421,12 +428,12 @@ function Ship:AddWarning()
     self.warnings += 1
     --Check if max warnings is reached
     if self.warnings >= MAX_WARNINGS then
-        --Reset warnings
-        self.warnings = 0
-        --Increment reset cycle
-        self.resetCycle += 1
         --Reset ship
-        self:Reset(true)
+        self:Reset()
+        --Dismount if mounted
+        if self.mounted then
+            self:ToggleMount(false)
+        end
         --Reload player's character
         self.player:LoadCharacter()
     else

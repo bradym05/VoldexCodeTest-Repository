@@ -331,6 +331,13 @@ function PlayerShip:ToggleMount(toggle : boolean?)
         end
         --Remove reference to current turn
         self.currentTurn = nil
+        --Reset direction variables
+        self.activeDirections = 0
+        self.directionTotal = 0
+        --Set velocity to 0
+        self.linearVelocity.VectorVelocity = Vector3.new()
+        self.angularVelocity.AngularVelocity = Vector3.new()
+        self.turnMotor.DesiredAngle = 0
         --Update states
         self.humanoid.PlatformStand = false
         --Disable motor animations
