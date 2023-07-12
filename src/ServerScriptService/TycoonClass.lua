@@ -109,16 +109,16 @@ local Tycoon = {}
 Tycoon.__index = Tycoon
 
 --Load tycoon with previously purchased objects
-function Tycoon.new(Player : Player)
+function Tycoon.new(player : Player)
     --Create class object
     local self = {}
-    self.Player = Player
+    self.player = player
     --Create a connections table for GC
     self.connections = {}
     --Create tycoon
     self.tycoonModel = tycoonTemplate:Clone()
     --Get DataObject
-    self.DataObject = PlayerData.getDataObject(Player)
+    self.DataObject = PlayerData.getDataObject(player)
     --Create collision group names
     self.characterGroup = self.DataObject.Key..characterGroupSuffix
     self.padsGroup = self.DataObject.Key..padsGroupSuffix
@@ -141,7 +141,7 @@ function Tycoon.new(Player : Player)
     --Get first available slot
     self.slot = getSlot()
     --getSlot() function may yield, check if player left
-    if Player and Player:IsDescendantOf(Players) then
+    if player and player:IsDescendantOf(Players) then
         --Correctly position tycoon
         self.tycoonModel:PivotTo(translateCFrame(self.tycoonModel:GetPivot(), self.slot))
         --Name tycoon to UserId and parent
@@ -165,19 +165,19 @@ function Tycoon.new(Player : Player)
         --Initialize Paycheck Machince
         self:PaycheckSetup()
         --Set respawn location
-        Player.RespawnLocation = self.tycoonModel.Essentials.SpawnLocation
-        --Connect Tycoon:CharacterAdded() to Player.CharacterAdded
+        player.RespawnLocation = self.tycoonModel.Essentials.SpawnLocation
+        --Connect Tycoon:CharacterAdded() to player.CharacterAdded
         local characterAddedConnection
-        characterAddedConnection = Player.CharacterAdded:Connect(function(character : Model)
+        characterAddedConnection = player.CharacterAdded:Connect(function(character : Model)
             self:CharacterAdded(character)
         end)
         --Add to connections for GC
         table.insert(self.connections, characterAddedConnection)
         --Load first character
-        Player:LoadCharacter()
+        player:LoadCharacter()
         return self
     else
-        --Player left the game, destroy tycoon and cancel setup
+        --player left the game, destroy tycoon and cancel setup
         self:Destroy()
         return
      end
@@ -232,7 +232,7 @@ function Tycoon:CheckShip()
     --Check if all ship pieces are purchased, and tycoon is loaded to keep dependencies accurate. Make sure ship is not already created. Make sure player has claimed ticket.
     if self.loaded and not self.shipObject and self.DataObject:GetData("Ticket") == true and #self.shipPieces >= requiredShip then
         --Create ship object
-        self.shipObject = ShipClass.new(self.Player, self.shipPieces)
+        self.shipObject = ShipClass.new(self.player, self.shipPieces)
         --Set character of ship object if loaded
         if self.character then
             self.shipObject:SetCharacter(self.character)
@@ -244,7 +244,6 @@ end
 function Tycoon:PaycheckSetup()
     --Initialize variables
     local paycheckMachine = self.tycoonModel:WaitForChild("PaycheckMachine")
-    local moneyLabel = paycheckMachine:WaitForChild("Money_Info_Text"):WaitForChild("SurfaceGui"):WaitForChild("MoneyLabel")
     local touchPart = paycheckMachine:WaitForChild("PadComponents"):WaitForChild("Pad")
     local debounce = false
     --Set collision group of pad
@@ -260,19 +259,12 @@ function Tycoon:PaycheckSetup()
             --Reset money to collect
             self.DataObject:SetData("MoneyToCollect", 0)
             --Tell player to animate press
-            padTouchedRemote:FireClient(self.Player, paycheckMachine, false, true)
+            padTouchedRemote:FireClient(self.player, paycheckMachine, false, true)
             --Cooldown time
             task.wait(PAD_COOLDOWN)
             --Allow next collection
             debounce = false
         end
-    end)
-    --Set initial appearance to initial money to collect
-    moneyLabel.Text = "$ "..tostring(self.DataObject:GetData("MoneyToCollect"))
-    --Set appearance when money to collect changes
-    local collectChanged
-    collectChanged = self.DataObject:ListenToChange("MoneyToCollect", function(newValue : number)
-        moneyLabel.Text = "$ "..tostring(newValue)
     end)
     --Connect to core paycheck loop
     paychecks[self] = function()
@@ -281,7 +273,6 @@ function Tycoon:PaycheckSetup()
     end
     --Add connections to local connections table for GC
     table.insert(self.connections, touched)
-    table.insert(self.connections, collectChanged)
 end
 
 --Sets CollisionGroup of entire character securely
@@ -296,7 +287,7 @@ function Tycoon:CharacterAdded(character : Model)
         self.shipObject:SetCharacter(character)
     end
     --Disconnect when character is removing
-    removingConnection = self.Player.CharacterRemoving:Connect(function(removing : Model)
+    removingConnection = self.player.CharacterRemoving:Connect(function(removing : Model)
         --Make sure the removing character is the defined character
         if removing == character then
             --Disconnect
@@ -306,7 +297,7 @@ function Tycoon:CharacterAdded(character : Model)
     end)
     --Load new character if player dies
     character:WaitForChild("Humanoid").Died:Once(function()
-        self.Player:LoadCharacter()
+        self.player:LoadCharacter()
     end)
     --Catch loaded parts
     for _, descendant in pairs(character:GetDescendants()) do
@@ -359,7 +350,7 @@ function Tycoon:ActivatePad(Pad : Model, target : string)
                 --No need to keep touched event connected
                 touched:Disconnect()
                 --Tell player to animate pad purchase
-                padTouchedRemote:FireClient(self.Player, Pad, true)
+                padTouchedRemote:FireClient(self.player, Pad, true)
                 --Subtract price from player's money
                 self.DataObject:IncrementData("Money", -price)
                 --Save purchase
@@ -372,7 +363,7 @@ function Tycoon:ActivatePad(Pad : Model, target : string)
                 self:Fulfill(target)
             else
                 --Tell player to animate pad purchase failed
-                padTouchedRemote:FireClient(self.Player, Pad, false)
+                padTouchedRemote:FireClient(self.player, Pad, false)
                 --Cooldown time
                 task.wait(PAD_COOLDOWN)
             end
@@ -447,14 +438,14 @@ function Tycoon:TicketCabinSetup(cabin : Model)
         local promptTriggered
         promptTriggered = ticketPrompt.Triggered:Connect(function(playerWhoTriggered)
             --Check that owner of tycoon triggered prompt
-            if playerWhoTriggered == self.Player then
+            if playerWhoTriggered == self.player then
                 --Disconnect and destroy prompt
                 promptTriggered:Disconnect()
                 ticketPrompt:Destroy()
                 --Grant ticket
                 self.DataObject:SetData("Ticket", true)
                 --Tell player they have received their ticket
-                ticketRemote:FireClient(self.Player)
+                ticketRemote:FireClient(self.player)
                 --Check ship
                 self:CheckShip()
             end

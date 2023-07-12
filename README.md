@@ -30,6 +30,15 @@ Other Notes:<br />
 -Turned on StreamingEnabled. <br />
 -Updated CollisionFidelities and model streaming modes. <br />
 -Renamed pad components. <br />
+-Created a tycoon template to be cloned for each player. <br />
+-Seperated buildings from template to keep only one copy in memory. <br />
+-Removed unnecessary "isPaycheckMachine" attribute from PaycheckMachine. <br />
+-Removed "isEnabled," and "isFinished" attributes from Pads. <br />
+-Created a folder named "Tycoons" to hold tycoons. <br />
+-Placed the price BillboardGui in ServerStorage to clone it under each pad. <br />
+-Moved buildings down to connect with ground. <br />
+-Renamed buildings and pads. <br />
+-Centered tycoon. <br />
 -Created sound group for game. <br />
 -Created sound group for GUI. <br />
 -Created new beam textures and restructured beams. <br />
@@ -72,14 +81,15 @@ PlayerData:<br />
 -The functions are too specific and most are redundant. Data does not save. <br />
 
 (Refactored)<br />
--Data is stored as a dictionary to a single key for each user<br />
--DataStore requests are made based on the current budget, with custom yielding<br />
--Data is only saved and loaded when necessary<br />
--MemoryStoreService is used to refer UserId to a boolean value indicating if that user's data is currently saving<br />
--Players whose data is saving in another server will be kicked to prevent duplication or data loss<br />
--Error codes are retrieved and handled uniquely based on the current documentation<br />
--Active processes are counted to ensure all processes complete on BindToClose<br />
--All methods like "ArrayInsert" which change data refer back to the "SetData" method to handle all changes in one place<br />
+-Data is stored as a dictionary to a single key for each user.<br />
+-DataStore requests are made based on the current budget, with custom yielding.<br />
+-Data is only saved and loaded when necessary.<br />
+-MemoryStoreService is used to refer UserId to a boolean value indicating if that user's data is currently saving.<br />
+-Players whose data is saving in another server will be kicked to prevent duplication or data loss.<br />
+-Error codes are retrieved and handled uniquely based on the current documentation.<br />
+-Active processes are counted to ensure all processes complete on BindToClose.<br />
+-All methods like "ArrayInsert" which change data refer back to the "SetData" method to handle all changes in one place.<br />
+-The methods "IncrementData" and "MultiplyData" allow for easy manipulation of number data.<br />
 
 MainHandler (was TycoonHandler) (PadService replacement): <br />
 
@@ -91,20 +101,11 @@ MainHandler (was TycoonHandler) (PadService replacement): <br />
 -Added a saving MoneyToCollect value for Paycheck Machines. <br />
 -Also manages a hidden stats folder handled the same as leaderstats. <br />
 
--Created a tycoon template to be cloned for each player. <br />
--Seperated buildings from template to keep only one copy in memory. <br />
--Removed unnecessary "isPaycheckMachine" attribute from PaycheckMachine. <br />
--Removed "isEnabled," and "isFinished" attributes from Pads. <br />
--Created a folder named "Tycoons" to hold tycoons. <br />
--Placed the price BillboardGui in ServerStorage to clone it under each pad. <br />
--Moved buildings down to connect with ground. <br />
--Renamed buildings and pads. <br />
--Centered tycoon. <br />
-
 -Contains a list of settings which can be modified and read by players. <br />
 -Connects to remote event and function allowing players to set and read certain data. <br />
 -Yields player data if not loaded using CustomSignal to prevent errors. <br />
 -Ensures that only accessible data is read and written to. <br />
+-Includes a table of changed callbacks for custom handling of data changes (increasing paycheck price on change). <br />
 
 TycoonClass: <br />
 
@@ -156,6 +157,7 @@ InterfaceHandler (UiHandler refactored):<br />
 -Gets default GUI size of GUI objects that should change by device. <br />
 -Updates GUI size and position from initial device or if device changes. <br />
 -Creates a SizeConstraint if size is changed (for tweens). <br />
+-Sets up developer product buttons to prompt purchases. <br />
 
 Animations:<br />
 
@@ -165,6 +167,7 @@ Animations:<br />
 -Sinks pad into ground and emits coin particles if purchase succeeds.<br />
 -Beams shoot upwards and fade out if purchase succeeds.<br />
 -Plays purchase sound from pad.<br />
+-Tweens paycheck machine text from replicated MoneyToCollect value.<br />
 
 -Listens to ChildAdded in tycoon buildings folder.<br />
 -Checks build animations setting.<br />
@@ -307,6 +310,16 @@ ShipsClient:<br />
 -Sets up existing and newly created ships.<br />
 -Determines whether to create a ShipReplicator or PlayerShip object for ships.<br />
 -Destroys ship objects when ship is destroying. <br />
+
+ProductHandler:<br />
+
+-Contains a dictionary referring product ids to functions fulfilling the purchase.<br />
+-Callback functions return a boolean indicating success.<br />
+-Successful purchases are stored to the player's DataObject.<br />
+-Ensures that purchase was not previously granted by checking player's DataObject.<br />
+-Returns nil if something goes wrong to indicate that the purchase should be handled again.<br />
+-Returns NotProcessedYet if no callback exists to indicate that the purchase should not be handled again.<br />
+-Returns purchase granted if all checks are passed and callback succeeds.<br />
 
 Misc:<br />
 

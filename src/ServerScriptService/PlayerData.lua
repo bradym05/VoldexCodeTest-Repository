@@ -2,7 +2,7 @@
 This module initializes an OOP "PlayerData" class for ease of use. Each created object handles access to DataStores with security and loss prevention at the forefront.
 See: https://devforum.roblox.com/t/details-on-datastoreservice-for-advanced-developers/175804
 
-MemoryStoreService is used for session locking, preventing data from saving on multiple servers. 
+MemoryStoreService is used for session locking, preventing data from saving on multiple servers.
 
 --]]
 
@@ -18,7 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 
 --Current save
-local SaveFile : DataStore = DataStoreService:GetDataStore("ReleaseSave")
+local SaveFile : DataStore = DataStoreService:GetDataStore("ReleaseSave_2")
 --Active saving store
 local SaveStore : MemoryStoreSortedMap = MemoryStoreService:GetSortedMap("UserSaving")
 
@@ -69,7 +69,7 @@ local function checkValue(returned)
     return type(returned) == "string" or 
         type(returned) == "number" or 
         type(returned) == "boolean" or 
-        (type(returned) == "table" and not is_mixed(returned)) 
+        (type(returned) == "table" and not is_mixed(returned))
 end
 
 --When a request is dropped, it means the request has exceeded the maximum queue size so best practice is to yield one minute
@@ -246,28 +246,28 @@ local DataObject = {
 DataObject.__index = DataObject
 
 --Allow external scripts to manage data without creating it
-function DataObject.getDataObject(Player : Player)
+function DataObject.getDataObject(player : Player)
    --Check if data is loaded and return first
-    if playerToData[Player] then
-        return playerToData[Player]
+    if playerToData[player] then
+        return playerToData[player]
     else
         --Create signal if not created
-        if not loadedSignals[Player] then
-            loadedSignals[Player] = CustomSignal.new()
+        if not loadedSignals[player] then
+            loadedSignals[player] = CustomSignal.new()
         end
         --Yield result of loaded signal
-        local success = loadedSignals[Player]:Wait()
+        local success = loadedSignals[player]:Wait()
         --Return data or false
-        return success and playerToData[Player] or false
+        return success and playerToData[player] or false
     end
 end
 
 --Creates a new DataObject. Performs checks to ensure that player is not still saving in another server before proceeding.
-function DataObject.new(Player : Player)
+function DataObject.new(player : Player)
     --Create object and corresponding variables
     local self = {}
-    self.Player = Player 
-    self.Key = tostring(Player.UserId) -- Store string UserId in case player leaves before operation
+    self.player = player 
+    self.Key = tostring(player.UserId) -- Store string UserId in case player leaves before operation
     self.lastGet = os.clock() - CACHE_TIME -- Prevent unnecessary requests (subtract CACHE_TIME to allow for initial read)
     self.changed = false
     self.inMemory = false -- Prevent unnecessary attempts to remove player from memory
@@ -281,11 +281,11 @@ function DataObject.new(Player : Player)
     --Check if value was successfully retrieved
     if getSuccess then
         --Check if player's data is saving in another server
-        if getResult and getResult ~= serverId and Player and Player:IsDescendantOf(Players) then
+        if getResult and getResult ~= serverId and player and player:IsDescendantOf(Players) then
             --Clean up without saving
             self:Destroy(true)
             --Kick player
-            Player:Kick("Your data is saving in another server")
+            player:Kick("Your data is saving in another server")
             return false
         end
     else
@@ -303,10 +303,10 @@ function DataObject.new(Player : Player)
     if not self.Data then
         self.Data = DataObject.TEMPLATE
     end
-    --The previous methods yield, so make sure Player has not left
-    if Player and Player:IsDescendantOf(Players) then
+    --The previous methods yield, so make sure player has not left
+    if player and player:IsDescendantOf(Players) then
         --Create reference and return
-        playerToData[Player] = self
+        playerToData[player] = self
         return self
     else
         --Clean up without saving
@@ -426,6 +426,19 @@ function DataObject:IncrementData(key : string, inc : number) : boolean
     return false
 end
 
+--Multiply number values
+function DataObject:MultiplyData(key : string, multi : number) : boolean
+    --Get initial value
+    local initialValue = self:GetData(key)
+    --Check that value is a number
+    if initialValue and type(initialValue) == "number" then
+        --Set data to multiplied value
+        return self:SetData(key, initialValue * multi)
+    end
+    --Return false if check isn't passed
+    return false
+end
+
 --Insert into table values
 function DataObject:ArrayInsert(key : string, value : any) : boolean
     --Get initial value
@@ -464,18 +477,18 @@ end
 for i = 301,306 do codeChecks[tostring(i)] = requestDropped end
 
 --Clean up on leave
-Players.PlayerRemoving:Connect(function(Player : Player)
+Players.PlayerRemoving:Connect(function(player : Player)
     --Destroy data object and remove reference
-    if playerToData[Player] then
-        playerToData[Player]:Destroy()
-        playerToData[Player] = nil
+    if playerToData[player] then
+        playerToData[player]:Destroy()
+        playerToData[player] = nil
     end
     --Clean up loaded signal if active
-    if loadedSignals[Player] then
-        loadedSignals[Player]:FireOnce(false)
+    if loadedSignals[player] then
+        loadedSignals[player]:FireOnce(false)
     end
     --Remove reference
-    loadedSignals[Player] = nil
+    loadedSignals[player] = nil
 end)
 
 --Save on close

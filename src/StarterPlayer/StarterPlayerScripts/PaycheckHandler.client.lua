@@ -44,7 +44,6 @@ local requestUpgrade : RemoteEvent = remotes:WaitForChild("RequestUpgrade")
 --Settings
 local CAMERA_ANGLE = 20 --Camera angle (in degrees) specifying the amount to look down by
 local CAMERA_DISTANCE = 10 --Camera distance from coin pile
-local FOV = 15 --Base camera field of view
 local PAYCHECK_PER_COIN = 10 --Minimum paycheck increment for one coin
 local ANIM_TIME = 1.5 --Time for pile to scale in seconds and camera to adjust (coins fall in half this time)
 local PURCHASE_FAIL = sounds:WaitForChild("Error") -- Sound played upon failed purchase
@@ -71,18 +70,17 @@ local pileScale : number
 
 --Move camera based on settings and pile size
 local function setCamera(animate : boolean?)
-    --Scale fov to zoom in or out based on model size
-    local adjustedFOV = FOV * pileScale
+    --Move camera forward or back based on size
+    local adjustedDistance = math.clamp(CAMERA_DISTANCE * (pileScale/5), CAMERA_DISTANCE/10, math.huge)
     --Get camera height from angle and distance
-    local height = math.asin(math.rad(CAMERA_ANGLE)) * CAMERA_DISTANCE
+    local height = math.asin(math.rad(CAMERA_ANGLE)) * adjustedDistance
     --Set CFrame to match angle and distance and look at the coin pile
-    local cameraCFrame = CFrame.new(Vector3.new(0, height, CAMERA_DISTANCE), coinPile:GetPivot().Position)
+    local cameraCFrame = CFrame.new(Vector3.new(0, height, adjustedDistance), coinPile:GetPivot().Position)
     --Set camera
     if animate then
-        QuickTween(viewportCamera, cameraTF, {["FieldOfView"] = adjustedFOV, ["CFrame"] = cameraCFrame})
+        QuickTween(viewportCamera, cameraTF, {["CFrame"] = cameraCFrame})
     else
         viewportCamera.CFrame = cameraCFrame
-        viewportCamera.FieldOfView = adjustedFOV
     end
 end
 

@@ -9,7 +9,7 @@
 --Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
+local MarketplaceService = game:GetService("MarketplaceService")
 local TweenService = game:GetService("TweenService")
 
 --Modules
@@ -17,6 +17,7 @@ local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
 local TweenAny = require(ReplicatedStorage:WaitForChild("TweenAny"))
 local InputDetection = require(ReplicatedStorage:WaitForChild("InputDetection"))
 local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
+local GUI = require(ReplicatedStorage:WaitForChild("GUI"))
 
 --Instances
 local player : Player = Players.LocalPlayer
@@ -201,6 +202,20 @@ local function buttonSetup(buttonHolder : Frame)
     end
 end
 
+--Sets up developer product buttons
+local function productButtonSetup(button : GuiButton)
+    --Get dev product id
+    local productId = button:GetAttribute("ProductId")
+    --Make sure it is valid
+    if productId and productId > 0 then
+        --Create button
+        local productButton = GUI.Button(button, function()
+            --Prompt purchase on click
+            MarketplaceService:PromptProductPurchase(player, productId)
+        end)
+    end
+end
+
 --Adjusts position and size of UI based on device
 local function adjustGui(inputDevice : string)
     --Iterate through all variable gui
@@ -285,7 +300,7 @@ moneyIncTweenIn.Completed:Connect(function()
     moneyIncTweenOut:Play()
 end)
 
---Initialize GUI variations
+--Initialize GUI variations and product buttons
 for _, guiObject : GuiBase in pairs(interface:GetDescendants()) do
     --First check if this object has a Udim2 size
     if guiObject:IsA("GuiBase") then
@@ -301,7 +316,11 @@ for _, guiObject : GuiBase in pairs(interface:GetDescendants()) do
                 break
             end
         end
-
+        --Check if this is a developer product button
+        if guiObject:IsA("GuiButton") and guiObject:GetAttribute("ProductId") then
+            --Setup with product setup function
+            productButtonSetup(guiObject)
+        end
     end
 end
 

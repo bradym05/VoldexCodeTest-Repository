@@ -31,6 +31,7 @@ local REPLICATED_HIDDEN = { --Put the names and value ClassNames of data to be r
     Paycheck = "IntValue",
     UpgradeCost = "IntValue",
     Ticket = "BoolValue",
+    MoneyToCollect = "IntValue",
 }
 local CLIENT_ACCESS = { --Data which can be read and changed by players
     "Settings"
@@ -51,32 +52,33 @@ PlayerData.TEMPLATE = {
         MusicVolume = 0.5,
         Particles = 1,
         BuildAnimations = true,
-    }
+    },
+    PurchaseHistory = {},
 }
 
 --Manipulated
 local playerToTycoon = {}
 local upgradeDebounce = {}
+local changeCallbacks = {}
 
 ------------------// PRIVATE FUNCTIONS \\------------------
-
 --Load players
-local function playerAdded(Player : Player)
+local function playerAdded(player : Player)
     --Create data object
-    local dataObject = PlayerData.new(Player)
+    local dataObject = PlayerData.new(player)
     --Make sure player loaded
     if dataObject then
         --Create tycoon and reference
-        local Tycoon = TycoonClass.new(Player)
-        playerToTycoon[Player] = Tycoon
+        local Tycoon = TycoonClass.new(player)
+        playerToTycoon[player] = Tycoon
         --Create leaderstats folder
         local leaderstats = Instance.new("Folder")
         leaderstats.Name = "leaderstats"
-        leaderstats.Parent = Player
+        leaderstats.Parent = player
         --Create hidden stats folder
         local hiddenstats = Instance.new("Folder")
         hiddenstats.Name = "hiddenstats"
-        hiddenstats.Parent = Player
+        hiddenstats.Parent = player
         --Loop through all replicated stats
         for name : string, ClassName : string in pairs(REPLICATED_STATS) do
             --Create value object and set loaded value
@@ -92,19 +94,23 @@ local function playerAdded(Player : Player)
             --Connect to changes
             dataObject:ListenToChange(name, function(newValue)
                 valueObject.Value = newValue
+                --Call custom function if it exists
+                if changeCallbacks[name] then
+                    changeCallbacks[name](newValue, dataObject)
+                end
             end)
         end
     end
 end
 
 --Clean up when players leave
-local function playerRemoving(Player : Player)
-    if playerToTycoon[Player] then
+local function playerRemoving(player : Player)
+    if playerToTycoon[player] then
         --Clean up tycoon
-        playerToTycoon[Player]:Destroy()
+        playerToTycoon[player]:Destroy()
         --Remove references
-        playerToTycoon[Player] = nil
-        upgradeDebounce[Player] = nil
+        playerToTycoon[player] = nil
+        upgradeDebounce[player] = nil
     end
 end
 
@@ -119,11 +125,11 @@ local function verifyAccess(dataName : string)
 end
 
 --Get data remote function
-local function getDataFunction(Player : Player, dataName : string)
+local function getDataFunction(player : Player, dataName : string)
     --Verify this is data accessible by the client
     if verifyAccess(dataName) then
         --Get data
-        local data = PlayerData.getDataObject(Player)
+        local data = PlayerData.getDataObject(player)
         --Verify data exists
         if data then
             --Return value
@@ -133,11 +139,11 @@ local function getDataFunction(Player : Player, dataName : string)
 end
 
 --Set data remote event
-local function setDataFunction(Player : Player, dataName : string, value : any)
+local function setDataFunction(player : Player, dataName : string, value : any)
     --Verify this is data accessible by the client
     if verifyAccess(dataName) then
         --Get data
-        local data = PlayerData.getDataObject(Player)
+        local data = PlayerData.getDataObject(player)
         --Verify data exists
         if data then
             --Set data
@@ -146,31 +152,39 @@ local function setDataFunction(Player : Player, dataName : string, value : any)
     end
 end
 
+--Update paycheck price on change
+local function onPaycheckChanged(newValue : number, dataObject)
+    --Get the ratio of current paycheck to base paycheck
+    local paycheckRatio = math.round(newValue/BASE_PAYCHECK)
+    --Multiply ratio by upgrade cost
+    local newPrice = paycheckRatio * BASE_UPGRADE_PRICE
+    --Set data
+    dataObject:SetData("UpgradeCost", newPrice)
+end
+
 --Upgrade paycheck remote event
-local function upgradePaycheckFunction(Player : Player)
+local function upgradePaycheckFunction(player : Player)
     --Make sure another purchase is not processing
-    if not upgradeDebounce[Player] then
+    if not upgradeDebounce[player] then
         --Disable other upgrade requests
-        upgradeDebounce[Player] = true
+        upgradeDebounce[player] = true
         --Get data
-        local data = PlayerData.getDataObject(Player)
+        local dataObject = PlayerData.getDataObject(player)
         --Verify data exists
-        if data then
+        if dataObject then
             --Get balance and price
-            local money = data:GetData("Money")
-            local price = data:GetData("UpgradeCost")
+            local money = dataObject:GetData("Money")
+            local price = dataObject:GetData("UpgradeCost")
             --Check sufficient funds
             if money >= price then
                 --Deduct price from player's balance
-                data:IncrementData("Money", -price)
-                --Increment next upgrade cost
-                data:IncrementData("UpgradeCost", BASE_UPGRADE_PRICE)
+                dataObject:IncrementData("Money", -price)
                 --Increment paycheck
-                data:IncrementData("Paycheck", BASE_PAYCHECK)
+                dataObject:IncrementData("Paycheck", BASE_PAYCHECK)
             end
         end
         --Enable other upgrade requests
-        upgradeDebounce[Player] = false
+        upgradeDebounce[player] = false
     end
 end
 
@@ -182,9 +196,12 @@ for i,v in pairs(REPLICATED_HIDDEN) do
 end
 
 --Catch players who may have already loaded
-for _, Player : Player in pairs(Players:GetPlayers()) do
-    task.spawn(playerAdded, Player)
+for _, player : Player in pairs(Players:GetPlayers()) do
+    task.spawn(playerAdded, player)
 end
+
+--Custom data changed callbacks
+changeCallbacks["Paycheck"] = onPaycheckChanged
 
 --Connections
 Players.PlayerAdded:Connect(playerAdded)

@@ -10,6 +10,7 @@ local QuickSound = require(ReplicatedStorage:WaitForChild("QuickSound"))
 local QuickTween = require(ReplicatedStorage:WaitForChild("QuickTween"))
 local TweenAny = require(ReplicatedStorage:WaitForChild("TweenAny"))
 local ParticleHandler = require(ReplicatedStorage:WaitForChild("ParticleHandler"))
+local CustomSignal = require(ReplicatedStorage:WaitForChild("CustomSignal"))
 local GUI = require(ReplicatedStorage:WaitForChild("GUI"))
 
 --Instances
@@ -17,6 +18,8 @@ local player : Player = Players.LocalPlayer
 local tycoons : Folder = workspace:WaitForChild("Tycoons")
 local playerTycoon : Model = tycoons:WaitForChild(tostring(player.UserId))
 local buildings : Folder = playerTycoon:WaitForChild("Purchased")
+local paycheckMachine : Model = playerTycoon:WaitForChild("PaycheckMachine")
+local moneyLabel : TextLabel = paycheckMachine:WaitForChild("Money_Info_Text"):WaitForChild("SurfaceGui"):WaitForChild("MoneyLabel")
 
 local particles : Folder = ReplicatedStorage:WaitForChild("Particles")
 local sounds : Folder = ReplicatedStorage:WaitForChild("Sounds")
@@ -29,6 +32,9 @@ local ticketClaimedSound : Sound = sounds:WaitForChild("TicketClaimed")
 local remotes : Folder = ReplicatedStorage:WaitForChild("Remotes")
 local padTouchedRemote : RemoteEvent = remotes:WaitForChild("PadTouched")
 local ticketRemote : RemoteEvent = remotes:WaitForChild("TicketClaimed")
+
+local hiddenstats : Folder = player:WaitForChild("hiddenstats")
+local collectValue : IntValue = hiddenstats:WaitForChild("MoneyToCollect")
 
 local settingsFolder : Folder = player:WaitForChild("Settings")
 local buildAnimationsSetting : BoolValue = settingsFolder:WaitForChild("BuildAnimations")
@@ -67,6 +73,8 @@ local ticketTweenOut = TweenService:Create(ticketImage, ticketTF, {Position = UD
 local coinExplosion = ParticleHandler.new(particles:WaitForChild("CoinExplosion"))
 
 --Manipulated
+local collectMoneyTweened = CustomSignal.new()
+local currentCollectMoney = collectValue.Value
 local cache = {}
 local ticketButton
 
@@ -262,3 +270,25 @@ end
 
 --Play ticket claimed animation
 ticketRemote.OnClientEvent:Connect(onTicketClaimed)
+
+------------------// PAYCHECK MACHINE \\------------------
+
+--Format paycheck machine value and set text
+local function updateCollectMoney(value : number)
+    moneyLabel.Text = "$ "..tostring(math.round(value))
+    currentCollectMoney = value
+end
+
+--Play animation
+local function animateCollectMoney()
+    TweenAny:TweenNumber(currentCollectMoney, collectValue.Value, 0.3, collectMoneyTweened)
+end
+
+--Set initial appearance
+updateCollectMoney(currentCollectMoney)
+
+--Connect to value changed
+collectValue.Changed:Connect(animateCollectMoney)
+
+--Connect to tween
+collectMoneyTweened:Connect(updateCollectMoney)
