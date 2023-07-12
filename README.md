@@ -64,6 +64,8 @@ Other Notes:<br />
 -Created steering animations. <br />
 -Made entire ship massless. <br />
 -Removed all value objects. <br />
+-Designed shop button components. <br />
+-Created shop section for money and developer products from 5000 to 10 billion in game currency. <br />
 
 Generally, I use loleris' ProfileService and ReplicaService for DataStores and replication; but I decided against that for the sake of providing an accurate reflection of my abilities. I use other resources too, but the aforementioned are most relevant to this challenge. Everything provided here has been created solely for the Voldex code test and is not taken from my previous work, or anyone else's work. All of the code has been written as of 2023-06-27 or later. I am proud of my work here and I hope that it is up to par. Thank you again for this opportunity, it has been fun and exciting so far.<br />
 

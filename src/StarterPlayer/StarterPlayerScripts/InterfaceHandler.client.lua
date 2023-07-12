@@ -153,8 +153,8 @@ local function buttonSetup(buttonHolder : Frame)
     table.insert(tweenIns, TweenService:Create(buttonStroke, buttonTF, {Thickness = 3}))
     table.insert(tweenOuts, TweenService:Create(buttonStroke, buttonTF, {Thickness = 0}))
     --Create custom tweens
-    for _, buttonChild : GuiBase2d in pairs(imageButton:GetChildren()) do
-        --See which children have tweens
+    for _, buttonChild : GuiBase2d in pairs(imageButton:GetDescendants()) do
+        --See which descendants have tweens
         local goal = buttonChild:GetAttributes()
         if goal and next(goal) then
             --Get base values

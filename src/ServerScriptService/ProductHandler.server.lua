@@ -61,6 +61,60 @@ idToCallback[1576724296] = function(dataObject)
     return dataObject:MultiplyData("Paycheck", 2)
 end
 
+--Purchase of $5,000
+idToCallback[1579056078] = function(dataObject)
+    --Increment money by 5000 and return result
+    return dataObject:IncrementData("Money", 5000)
+end
+
+--Purchase of $50,000
+idToCallback[1579056157] = function(dataObject)
+    --Increment money by 50000 and return result
+    return dataObject:IncrementData("Money", 50000)
+end
+
+--Purchase of $100,000
+idToCallback[1579056466] = function(dataObject)
+    --Increment money by 100000 and return result
+    return dataObject:IncrementData("Money", 100000)
+end
+
+--Purchase of $500,000
+idToCallback[1579059335] = function(dataObject)
+    --Increment money by 500000 and return result
+    return dataObject:IncrementData("Money", 500000)
+end
+
+--Purchase of $1,000,000
+idToCallback[1579059553] = function(dataObject)
+    --Increment money by 1000000 and return result
+    return dataObject:IncrementData("Money", 1000000)
+end
+
+--Purchase of $5,000,000
+idToCallback[1579059720] = function(dataObject)
+    --Increment money by 5000000 and return result
+    return dataObject:IncrementData("Money", 5000000)
+end
+
+--Purchase of $1,000,000,000
+idToCallback[1579059915] = function(dataObject)
+    --Increment money by 1000000000 and return result
+    return dataObject:IncrementData("Money", 1000000000)
+end
+
+--Purchase of $5,000,000,000
+idToCallback[1579062329] = function(dataObject)
+    --Increment money by 5000000000 and return result
+    return dataObject:IncrementData("Money", 5000000000)
+end
+
+--Purchase of $10,000,000,000
+idToCallback[1579062389] = function(dataObject)
+    --Increment money by 10000000000 and return result
+    return dataObject:IncrementData("Money", 10000000000)
+end
+
 ---------------------// PRIVATE CODE \\--------------------
 
 --Connect callback to purchases
