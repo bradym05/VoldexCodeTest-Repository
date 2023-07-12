@@ -232,6 +232,12 @@ SettingsHandler:<br />
 GUI module:<br />
 
 -Stores OOP classes for reusable Gui components.<br />
+-Initializes the "Select" method to create highlights around selected GUI.<br />
+-Creates a private ScreenGui for overlay effects like the "Select" method.<br />
+-Selection method toggles or moves selection.<br />
+-A timestamp can be provided if a toggle needs to be made after delaying.<br />
+-Selection boxes match UI corner and update size/position with the selected object.<br />
+-Selection will slide if changed quickly, or fade in/out with the correct scale and position.<br />
 
 -Slider Class:<br />
 -Takes image button and progress bar as parameters.<br />
