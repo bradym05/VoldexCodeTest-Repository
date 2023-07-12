@@ -86,14 +86,13 @@ end
 
 --Scale pile of coins based on paycheck
 local function setPile(animate : boolean?)
-    --Get pile size
+    --Set pile scale
     pileScale = (paycheckStat.Value/PAYCHECK_PER_COIN)/10
     --Get half of pile size for min and max pos
-    local halfSize = (coinPile.Pile.Size * pileScale)/2
-    local pilePosition = coinPile:GetPivot().Position
+    local halfSize = (coinPile.Pile.Size/coinPile:GetScale() * pileScale)/2
     --Set min and max pos
-    minPos = pilePosition - halfSize
-    maxPos = pilePosition + halfSize
+    minPos = -halfSize
+    maxPos = halfSize
     --Scale pile
     if animate then
         TweenAny:TweenModel(coinPile, pileScale, ANIM_TIME)
@@ -104,27 +103,39 @@ end
 
 --Drop a coin
 local function dropCoins(count : number)
+    --Clamp the number of coin sounds to 10
+    local soundCount = math.clamp(count, 0, 10)
     --Create given number of coins
     for i = 1, count do
         --Clone coin model
         local coin = coinTemplate:Clone()
-        --Adjust size for visibility
-        coin.Size *= math.clamp(pileScale, 1, math.huge)
+        --Get height to start falling at
+        local startHeight = viewportCamera.CFrame.Position.Y + 5
         --Calculate random position above coin pile
         local position = Vector3.new(
             math.random(minPos.X, maxPos.X), --Get random x between min and max x
-            maxPos.Y + 15, --Move 15 studs above top of pile
-            math.random(minPos.Z, maxPos.Z) --Get random z between min and max z
+            startHeight,
+            math.random(maxPos.Z/2, maxPos.Z) --Get random z between half and max z (start at half so that coins stay in front of the pile)
         )
+        --Calculate fallen CFrame with random orientation
+        local fallenCFrame = CFrame.Angles(math.rad(math.random(0,360)),math.rad(math.random(0,360)),math.rad(math.random(0,360))) + Vector3.new(position.X, maxPos.Y - 5, position.Z)
+        --Create tween info with a random delay
+        local fallTF = TweenInfo.new(ANIM_TIME/2, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, math.random(0,ANIM_TIME * 50)/100)
+        --Adjust size for visibility
+        coin.Size *= math.clamp(pileScale, 1, math.huge)
         --Move coin to position with random orientation
         coin.CFrame = CFrame.Angles(math.rad(math.random(0,360)),math.rad(math.random(0,360)),math.rad(math.random(0,360))) + position
         --Make coin visible
         coin.Parent = viewport
-        --Play fall animation with random delay and connect to tween completed to destroy coin
-        QuickTween(coin,
-            TweenInfo.new(ANIM_TIME/2, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, math.random(0,ANIM_TIME * 50)/100), --Tween info with random delay between 0 and half of anim time (max time would be anim time)
-            {["CFrame"] = coin.CFrame * CFrame.Angles(math.rad(math.random(0,360)),math.rad(math.random(0,360)),math.rad(math.random(0,360))) - Vector3.new(0, (20 * pileScale), 0)}):Once(function() --Fall down with random orientation
+        --Play fall animation and connect to tween completed to destroy coin
+        QuickTween(coin, fallTF, {["CFrame"] = fallenCFrame}):Once(function()
+                --Destroy coin once tween completes
                 coin:Destroy()
+                --Check if a sound should play
+                if i <= soundCount then
+                    --Play coin dropping sound
+                    QuickSound(coinSounds[math.random(1, #coinSounds)])
+                end
             end)
     end
 end
