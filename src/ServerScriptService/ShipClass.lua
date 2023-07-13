@@ -299,6 +299,7 @@ function Ship:SetCharacter(character : Model)
     --Disconnect from character child added if connected
     if self.childAddedConnection and self.childAddedConnection.Connected then
         self.childAddedConnection:Disconnect()
+        self.childAddedConnection = nil
     end
     --Get humanoid or primary part if either has not loaded
     if not self.humanoid or not self.characterLoaded then
@@ -314,13 +315,15 @@ function Ship:SetCharacter(character : Model)
             if self.characterLoaded and self.humanoid then
                 self.childAddedConnection:Disconnect()
                 self.childAddedConnection = nil
-                --Reset ship
+                --Reset ship and dismount
                 self:Reset()
+                self:ToggleMount(false)
             end
         end)
     else
-        --Reset ship
+        --Reset ship and dismount
         self:Reset()
+        self:ToggleMount(false)
     end
 end
 
